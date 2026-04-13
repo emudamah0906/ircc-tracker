@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase, ProcessingTime } from "@/lib/supabase";
 import { getFlagEmoji } from "@/lib/countries";
 import TrendChart from "@/components/TrendChart";
@@ -147,11 +147,24 @@ export default function Home() {
     setShowCountryDropdown(false);
   }
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (!target.closest("#country-dropdown-root")) {
+        setShowCountryDropdown(false);
+        setCountrySearch("");
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
   return (
     <div className="canada-bg text-white">
       <Header activeNav="processing" lastUpdated={lastUpdated} />
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8" style={{ position: "relative", zIndex: 1 }}>
+      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
 
         {loading ? (
           <div className="text-center py-32 text-gray-500">Loading processing times...</div>
@@ -250,7 +263,7 @@ export default function Home() {
               </div>
 
               {/* Country search dropdown */}
-              <div className="relative max-w-md mx-auto">
+              <div id="country-dropdown-root" className="relative max-w-md mx-auto" style={{ zIndex: 200 }}>
                 <div
                   className="canada-input flex items-center gap-3 cursor-pointer py-3 px-4"
                   onClick={() => setShowCountryDropdown(!showCountryDropdown)}
@@ -263,8 +276,8 @@ export default function Home() {
                 </div>
 
                 {showCountryDropdown && (
-                  <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-white/10 overflow-hidden z-50"
-                    style={{ background: "#0d1b35", maxHeight: "300px", overflowY: "auto" }}>
+                  <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-white/10 overflow-hidden"
+                    style={{ background: "#0d1b35", maxHeight: "300px", overflowY: "auto", zIndex: 300 }}>
                     <div className="p-2 sticky top-0" style={{ background: "#0d1b35" }}>
                       <input
                         type="text"
@@ -372,12 +385,6 @@ export default function Home() {
                 <TrendChart countryCode={selectedCountry} visaType={selectedVisa} />
               </section>
             )}
-
-            {/* ── ALERT SIGNUP — moved up ── */}
-            <AlertSignup
-              visaTypes={VISA_TYPES.slice(1)}
-              countries={allCountries}
-            />
 
             {/* ── ALL COUNTRIES TABLE ── */}
             <section>
@@ -511,6 +518,12 @@ export default function Home() {
                 </div>
               )}
             </section>
+
+            {/* ── ALERT SIGNUP — bottom ── */}
+            <AlertSignup
+              visaTypes={VISA_TYPES.slice(1)}
+              countries={allCountries}
+            />
           </>
         )}
       </main>
