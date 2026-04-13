@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase, ProcessingTime } from "@/lib/supabase";
+import { getFlagEmoji } from "@/lib/countries";
 import TrendChart from "@/components/TrendChart";
 import AlertSignup from "@/components/AlertSignup";
 
@@ -154,7 +155,7 @@ export default function Home() {
                 >
                   {allCountries.map((c) => (
                     <option key={c} value={c}>
-                      {data.find((r) => r.country_code === c)?.country_name || c}
+                      {getFlagEmoji(c)} {data.find((r) => r.country_code === c)?.country_name || c}
                     </option>
                   ))}
                 </select>
@@ -192,7 +193,10 @@ export default function Home() {
                     {filtered.map((row, i) => (
                       <tr key={i} className="bg-gray-950 hover:bg-gray-900 transition-colors">
                         <td className="px-4 py-3">{row.visa_label}</td>
-                        <td className="px-4 py-3 text-gray-300">{row.country_name}</td>
+                        <td className="px-4 py-3 text-gray-300">
+                          <span className="mr-2">{getFlagEmoji(row.country_code)}</span>
+                          {row.country_name || row.country_code}
+                        </td>
                         <td className="px-4 py-3 text-right font-mono">
                           <span
                             className={`px-2 py-0.5 rounded text-xs font-semibold ${
