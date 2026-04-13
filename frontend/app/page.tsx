@@ -37,6 +37,7 @@ export default function Home() {
   const [selectedVisa, setSelectedVisa] = useState("all");
   const [sortBy, setSortBy] = useState<"alpha" | "fastest" | "slowest">("alpha");
   const [currentPage, setCurrentPage] = useState(1);
+  const [tableSearch, setTableSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
@@ -78,14 +79,41 @@ export default function Home() {
     .filter(r => r.country_code === selectedCountry)
     .filter(r => selectedVisa === "all" || r.visa_type === selectedVisa);
 
-  let tableData = data;
-  if (selectedVisa !== "all") tableData = tableData.filter(r => r.visa_type === selectedVisa);
-  if (sortBy === "alpha") tableData = [...tableData].sort((a, b) => a.country_name.localeCompare(b.country_name));
-  else if (sortBy === "fastest") tableData = [...tableData].sort((a, b) => a.processing_weeks - b.processing_weeks);
-  else tableData = [...tableData].sort((a, b) => b.processing_weeks - a.processing_weeks);
+  // Build grouped table: group by country, filter by visa + search, sort
+  type CountryGroup = { code: string; name: string; rows: ProcessingTime[] };
 
-  const totalPages = Math.ceil(tableData.length / PAGE_SIZE);
-  const paginated = tableData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  let filteredRows = data;
+  if (selectedVisa !== "all") filteredRows = filteredRows.filter(r => r.visa_type === selectedVisa);
+
+  // Group by country
+  const groupMap = new Map<string, CountryGroup>();
+  for (const row of filteredRows) {
+    if (!groupMap.has(row.country_code)) {
+      groupMap.set(row.country_code, { code: row.country_code, name: row.country_name, rows: [] });
+    }
+    groupMap.get(row.country_code)!.rows.push(row);
+  }
+  let countryGroups = Array.from(groupMap.values());
+
+  // Search filter on country name
+  if (tableSearch.trim()) {
+    const q = tableSearch.toLowerCase();
+    countryGroups = countryGroups.filter(g =>
+      g.name.toLowerCase().includes(q) || g.code.toLowerCase().includes(q)
+    );
+  }
+
+  // Sort country groups
+  if (sortBy === "alpha") {
+    countryGroups.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sortBy === "fastest") {
+    countryGroups.sort((a, b) => Math.min(...a.rows.map(r => r.processing_weeks)) - Math.min(...b.rows.map(r => r.processing_weeks)));
+  } else {
+    countryGroups.sort((a, b) => Math.max(...b.rows.map(r => r.processing_weeks)) - Math.max(...a.rows.map(r => r.processing_weeks)));
+  }
+
+  const totalPages = Math.ceil(countryGroups.length / PAGE_SIZE);
+  const paginatedGroups = countryGroups.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const uniqueCountries = allCountries.length;
   const uniqueVisaTypes = [...new Set(data.map(r => r.visa_type))].length;
@@ -280,10 +308,13 @@ export default function Home() {
 
             {/* ── ALL COUNTRIES TABLE ── */}
             <section>
+              {/* Header row */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
                 <h2 className="section-title mb-0">
                   🌍 All Countries
-                  <span className="text-sm font-normal text-gray-500 ml-2">({tableData.length} results)</span>
+                  <span className="text-sm font-normal text-gray-500 ml-2">
+                    ({countryGroups.length} {countryGroups.length === 1 ? "country" : "countries"})
+                  </span>
                 </h2>
                 <div className="flex items-center gap-2 flex-wrap">
                   <select
@@ -305,49 +336,85 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Search bar */}
+              <div className="relative mb-3">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search by country name..."
+                  value={tableSearch}
+                  onChange={(e) => { setTableSearch(e.target.value); setCurrentPage(1); }}
+                  className="canada-input py-2.5 text-sm pl-9"
+                />
+                {tableSearch && (
+                  <button
+                    onClick={() => { setTableSearch(""); setCurrentPage(1); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white text-lg leading-none"
+                  >×</button>
+                )}
+              </div>
+
               <div className="canada-table overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-gray-400 uppercase text-xs">
                     <tr>
-                      <th className="px-4 py-3 text-left">#</th>
+                      <th className="px-4 py-3 text-left w-10">#</th>
                       <th className="px-4 py-3 text-left">Country</th>
                       <th className="px-4 py-3 text-left">Visa Type</th>
                       <th className="px-4 py-3 text-right">Wait Time</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {paginated.map((row, i) => (
-                      <tr
-                        key={i}
-                        className={`transition-colors cursor-pointer ${row.country_code === selectedCountry ? "bg-red-900/10" : ""}`}
-                        onClick={() => { setSelectedCountry(row.country_code); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                      >
-                        <td className="px-4 py-3 text-gray-600 text-xs">{(currentPage - 1) * PAGE_SIZE + i + 1}</td>
-                        <td className="px-4 py-3 text-gray-200 font-medium">
-                          <span className="mr-2">{getFlagEmoji(row.country_code)}</span>
-                          {row.country_name || row.country_code}
-                        </td>
-                        <td className="px-4 py-3 text-gray-400">{row.visa_label}</td>
-                        <td className="px-4 py-3 text-right font-mono">
-                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                            row.processing_weeks <= 30 ? "bg-green-900/60 text-green-300"
-                            : row.processing_weeks <= 90 ? "bg-yellow-900/60 text-yellow-300"
-                            : "bg-red-900/60 text-red-300"
-                          }`}>
-                            {row.processing_weeks} {row.unit}
-                          </span>
+                  <tbody>
+                    {paginatedGroups.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-10 text-center text-gray-500 text-sm">
+                          No countries found matching &ldquo;{tableSearch}&rdquo;
                         </td>
                       </tr>
+                    )}
+                    {paginatedGroups.map((group, gi) => (
+                      group.rows.map((row, ri) => (
+                        <tr
+                          key={`${group.code}-${row.visa_type}`}
+                          className={`transition-colors cursor-pointer ${
+                            group.code === selectedCountry ? "bg-red-900/10" : ri % 2 === 0 ? "" : "bg-white/[0.01]"
+                          } ${ri === 0 ? "border-t border-white/10" : "border-t border-white/5"}`}
+                          onClick={() => { setSelectedCountry(group.code); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                        >
+                          {/* # and Country only on first row of group */}
+                          {ri === 0 ? (
+                            <>
+                              <td className="px-4 py-3 text-gray-500 text-xs align-top pt-4" rowSpan={group.rows.length}>
+                                {(currentPage - 1) * PAGE_SIZE + gi + 1}
+                              </td>
+                              <td className="px-4 py-3 align-top pt-4 font-semibold text-gray-100" rowSpan={group.rows.length}>
+                                <span className="text-lg mr-2">{getFlagEmoji(group.code)}</span>
+                                {group.name || group.code}
+                              </td>
+                            </>
+                          ) : null}
+                          <td className="px-4 py-2.5 text-gray-400 text-xs">{row.visa_label}</td>
+                          <td className="px-4 py-2.5 text-right">
+                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                              row.processing_weeks <= 30 ? "bg-green-900/60 text-green-300"
+                              : row.processing_weeks <= 90 ? "bg-yellow-900/60 text-yellow-300"
+                              : "bg-red-900/60 text-red-300"
+                            }`}>
+                              {row.processing_weeks} {row.unit}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              {/* Pagination */}
+              {/* Pagination — country-based */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4">
                   <p className="text-xs text-gray-500">
-                    Page {currentPage} of {totalPages} · {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, tableData.length)} of {tableData.length}
+                    Page {currentPage} of {totalPages} · showing countries {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, countryGroups.length)} of {countryGroups.length}
                   </p>
                   <div className="flex gap-1">
                     <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
