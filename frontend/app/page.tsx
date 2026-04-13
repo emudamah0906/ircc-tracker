@@ -24,15 +24,18 @@ export default function Home() {
   const [selectedVisa, setSelectedVisa] = useState("all");
   const [selectedCountry, setSelectedCountry] = useState("IND");
   const [countrySearch, setCountrySearch] = useState("");
+  const [sortBy, setSortBy] = useState<"alpha" | "fastest" | "slowest">("alpha");
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     async function fetchData() {
       const { data: rows, error } = await supabase
         .from("latest_processing_times")
-        .select("*")
-        .order("processing_weeks", { ascending: true });
+        .select("*");
 
       if (error) { console.error(error); return; }
       setData(rows || []);
@@ -51,10 +54,21 @@ export default function Home() {
         (r) => r.country_name.toLowerCase().includes(q) || r.country_code.toLowerCase().includes(q)
       );
     }
+    // Sort
+    if (sortBy === "alpha") {
+      result = [...result].sort((a, b) => a.country_name.localeCompare(b.country_name));
+    } else if (sortBy === "fastest") {
+      result = [...result].sort((a, b) => a.processing_weeks - b.processing_weeks);
+    } else {
+      result = [...result].sort((a, b) => b.processing_weeks - a.processing_weeks);
+    }
     setFiltered(result);
-  }, [data, selectedVisa, countrySearch]);
+    setCurrentPage(1); // reset to page 1 on filter change
+  }, [data, selectedVisa, countrySearch, sortBy]);
 
-  const indiaRows = filtered.filter((r) => r.country_code === "IND");
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const indiaRows = data.filter((r) => r.country_code === "IND");
   const allCountries = [...new Set(data.map((r) => r.country_code))].sort();
 
   return (
@@ -133,38 +147,62 @@ export default function Home() {
 
             {/* Full Table */}
             <section>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="section-title mb-0">🌍 All Processing Times</h2>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search country..."
-                    value={countrySearch}
-                    onChange={(e) => setCountrySearch(e.target.value)}
-                    className="canada-input pl-8 py-1.5 w-48"
-                  />
-                  <svg className="absolute left-2.5 top-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-                  </svg>
+              {/* Controls */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
+                <h2 className="section-title mb-0">
+                  🌍 All Processing Times
+                  <span className="text-sm font-normal text-gray-500 ml-2">
+                    ({filtered.length} results)
+                  </span>
+                </h2>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Sort */}
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as "alpha" | "fastest" | "slowest")}
+                    className="canada-input py-1.5 text-xs w-36"
+                  >
+                    <option value="alpha">A → Z Country</option>
+                    <option value="fastest">Fastest First</option>
+                    <option value="slowest">Slowest First</option>
+                  </select>
+                  {/* Search */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search country..."
+                      value={countrySearch}
+                      onChange={(e) => setCountrySearch(e.target.value)}
+                      className="canada-input pl-8 py-1.5 w-44"
+                    />
+                    <svg className="absolute left-2.5 top-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                    </svg>
+                  </div>
                 </div>
               </div>
+
               <div className="canada-table overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-gray-400 uppercase text-xs">
                     <tr>
-                      <th className="px-4 py-3 text-left">Visa Type</th>
+                      <th className="px-4 py-3 text-left">#</th>
                       <th className="px-4 py-3 text-left">Country</th>
+                      <th className="px-4 py-3 text-left">Visa Type</th>
                       <th className="px-4 py-3 text-right">Wait Time</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {filtered.map((row, i) => (
+                    {paginated.map((row, i) => (
                       <tr key={i} className="transition-colors">
-                        <td className="px-4 py-3 text-gray-200">{row.visa_label}</td>
-                        <td className="px-4 py-3 text-gray-300">
+                        <td className="px-4 py-3 text-gray-600 text-xs">
+                          {(currentPage - 1) * PAGE_SIZE + i + 1}
+                        </td>
+                        <td className="px-4 py-3 text-gray-200 font-medium">
                           <span className="mr-2">{getFlagEmoji(row.country_code)}</span>
                           {row.country_name || row.country_code}
                         </td>
+                        <td className="px-4 py-3 text-gray-400">{row.visa_label}</td>
                         <td className="px-4 py-3 text-right font-mono">
                           <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                             row.processing_weeks <= 30
@@ -181,6 +219,51 @@ export default function Home() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-xs text-gray-500">
+                    Page {currentPage} of {totalPages} · Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+                  </p>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="px-2 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300"
+                    >«</button>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300"
+                    >Prev</button>
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 text-xs rounded ${
+                            currentPage === page
+                              ? "bg-red-600 text-white font-bold"
+                              : "bg-white/5 hover:bg-white/10 text-gray-300"
+                          }`}
+                        >{page}</button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300"
+                    >Next</button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="px-2 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300"
+                    >»</button>
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* Alert Signup */}
