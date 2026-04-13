@@ -7,17 +7,35 @@ import TrendChart from "@/components/TrendChart";
 import AlertSignup from "@/components/AlertSignup";
 import Header from "@/components/Header";
 
+// location: "outside" = applying from abroad | "inside" = already in Canada | "both" = applies to both
 const VISA_TYPES = [
-  { key: "all", label: "All Types" },
-  { key: "visitor-outside-canada", label: "Visitor Visa" },
-  { key: "work", label: "Work Permit" },
-  { key: "study", label: "Study Permit" },
-  { key: "supervisa", label: "Super Visa" },
-  { key: "child_dependent", label: "Dependent Child" },
-  { key: "child_adopted", label: "Adopted Child" },
-  { key: "refugees_gov", label: "Gov. Refugee" },
-  { key: "refugees_private", label: "Private Refugee" },
+  { key: "all", label: "All Types", location: "both" },
+  { key: "visitor-outside-canada", label: "Visitor Visa (TRV)", location: "outside" },
+  { key: "work", label: "Work Permit", location: "both" },
+  { key: "study", label: "Study Permit", location: "both" },
+  { key: "supervisa", label: "Super Visa", location: "outside" },
+  { key: "child_dependent", label: "Dependent Child", location: "both" },
+  { key: "child_adopted", label: "Adopted Child", location: "both" },
+  { key: "refugees_gov", label: "Gov. Refugee", location: "both" },
+  { key: "refugees_private", label: "Private Refugee", location: "both" },
 ];
+
+const LOCATION_CONFIG = {
+  outside: {
+    icon: "✈️",
+    label: "Applying from Outside Canada",
+    sublabel: "Visitor visa, work/study permit, super visa",
+    tip: "Processing times shown are for applications submitted from your home country to a Canadian visa office.",
+    relevantVisas: ["visitor-outside-canada", "work", "study", "supervisa", "child_dependent", "child_adopted", "refugees_gov", "refugees_private"],
+  },
+  inside: {
+    icon: "🇨🇦",
+    label: "Already in Canada",
+    sublabel: "Extensions, renewals, PR, citizenship",
+    tip: "Processing times for applications submitted inside Canada. This includes permit extensions, renewals, and PR applications.",
+    relevantVisas: ["work", "study", "child_dependent", "child_adopted", "refugees_gov", "refugees_private"],
+  },
+};
 
 const POPULAR_COUNTRIES = [
   { code: "IND", name: "India" },
@@ -43,6 +61,7 @@ export default function Home() {
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [latestCRS, setLatestCRS] = useState<number | null>(null);
   const [latestDrawDate, setLatestDrawDate] = useState<string | null>(null);
+  const [location, setLocation] = useState<"outside" | "inside">("outside");
 
   const PAGE_SIZE = 20;
 
@@ -75,14 +94,18 @@ export default function Home() {
 
   const selectedCountryName = allCountries.find(c => c.code === selectedCountry)?.name || selectedCountry;
 
+  const locationVisas = LOCATION_CONFIG[location].relevantVisas;
+  const visibleVisaTypes = VISA_TYPES.filter(v => v.key === "all" || locationVisas.includes(v.key));
+
   const countryCards = data
     .filter(r => r.country_code === selectedCountry)
+    .filter(r => locationVisas.includes(r.visa_type))
     .filter(r => selectedVisa === "all" || r.visa_type === selectedVisa);
 
   // Build grouped table: group by country, filter by visa + search, sort
   type CountryGroup = { code: string; name: string; rows: ProcessingTime[] };
 
-  let filteredRows = data;
+  let filteredRows = data.filter(r => locationVisas.includes(r.visa_type));
   if (selectedVisa !== "all") filteredRows = filteredRows.filter(r => r.visa_type === selectedVisa);
 
   // Group by country
@@ -178,11 +201,39 @@ export default function Home() {
 
             {/* ── HERO: Country Selector ── */}
             <section className="canada-card p-8 text-center">
-              <h2 className="text-2xl font-bold mb-2">Check Processing Times For Your Country</h2>
-              <p className="text-gray-400 mb-6 text-sm">
-                Select your country to instantly see all visa wait times and trends.
-                Processing times are in <span className="text-white">weeks</span> as reported by IRCC.
-              </p>
+
+              {/* Location toggle */}
+              <div className="flex justify-center mb-6">
+                <div className="flex rounded-xl overflow-hidden border border-white/10" style={{ background: "rgba(255,255,255,0.04)" }}>
+                  {(["outside", "inside"] as const).map((loc) => (
+                    <button
+                      key={loc}
+                      onClick={() => { setLocation(loc); setSelectedVisa("all"); setCurrentPage(1); }}
+                      style={{
+                        padding: "10px 20px",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        border: "none",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        background: location === loc ? "linear-gradient(135deg, #d52b1e, #a01208)" : "transparent",
+                        color: location === loc ? "white" : "#9ca3af",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <span>{LOCATION_CONFIG[loc].icon}</span>
+                      <span className="hidden sm:inline">{loc === "outside" ? "Outside Canada" : "Inside Canada"}</span>
+                      <span className="sm:hidden">{loc === "outside" ? "Abroad" : "In Canada"}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <h2 className="text-2xl font-bold mb-1">{LOCATION_CONFIG[location].label}</h2>
+              <p className="text-gray-400 mb-2 text-sm">{LOCATION_CONFIG[location].sublabel}</p>
+              <p className="text-xs text-gray-500 mb-6 max-w-lg mx-auto">{LOCATION_CONFIG[location].tip}</p>
 
               {/* Popular country quick-picks */}
               <div className="flex flex-wrap justify-center gap-2 mb-5">
@@ -243,6 +294,28 @@ export default function Home() {
               </div>
             </section>
 
+            {/* ── INSIDE CANADA: extra info banner ── */}
+            {location === "inside" && (
+              <div className="canada-card p-5 border-blue-700/30" style={{ borderColor: "rgba(59,130,246,0.25)" }}>
+                <div className="flex items-start gap-3">
+                  <span className="text-xl">ℹ️</span>
+                  <div>
+                    <p className="text-sm font-semibold text-white mb-1">Applying from inside Canada?</p>
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      If you are already in Canada, you can extend or change your status (work permit, study permit, visitor record) before it expires.
+                      You can also apply for PR through Express Entry, PNP, or spousal sponsorship.
+                      The processing times shown below apply to <strong className="text-white">inside-Canada applications</strong>.
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <a href="/crs" className="canada-pill" style={{ fontSize: "11px", padding: "3px 12px" }}>🧮 Check your CRS Score</a>
+                      <a href="/draws" className="canada-pill" style={{ fontSize: "11px", padding: "3px 12px" }}>🗳 Latest PR Draws</a>
+                      <a href="/dashboard" className="canada-pill" style={{ fontSize: "11px", padding: "3px 12px" }}>📊 My PR Dashboard</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ── SELECTED COUNTRY: Visa Cards ── */}
             {countryCards.length > 0 ? (
               <section>
@@ -250,9 +323,9 @@ export default function Home() {
                   <h2 className="section-title mb-0">
                     {getFlagEmoji(selectedCountry)} {selectedCountryName} — Processing Times
                   </h2>
-                  {/* All visa type filters */}
+                  {/* Visa type filters — scoped to location */}
                   <div className="flex flex-wrap gap-2">
-                    {VISA_TYPES.map((v) => (
+                    {visibleVisaTypes.map((v) => (
                       <button
                         key={v.key}
                         onClick={() => setSelectedVisa(v.key)}
@@ -320,9 +393,9 @@ export default function Home() {
                   <select
                     value={selectedVisa}
                     onChange={(e) => { setSelectedVisa(e.target.value); setCurrentPage(1); }}
-                    className="canada-input py-1.5 text-xs w-36"
+                    className="canada-input py-1.5 text-xs w-40"
                   >
-                    {VISA_TYPES.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
+                    {visibleVisaTypes.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
                   </select>
                   <select
                     value={sortBy}
