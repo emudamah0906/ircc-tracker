@@ -18,6 +18,17 @@ const VISA_TYPES = [
   { key: "refugees_private", label: "Private Refugee" },
 ];
 
+const POPULAR_COUNTRIES = [
+  { code: "IND", name: "India" },
+  { code: "PHL", name: "Philippines" },
+  { code: "CHN", name: "China" },
+  { code: "NGA", name: "Nigeria" },
+  { code: "MEX", name: "Mexico" },
+  { code: "PAK", name: "Pakistan" },
+  { code: "GBR", name: "UK" },
+  { code: "USA", name: "USA" },
+];
+
 export default function Home() {
   const [data, setData] = useState<ProcessingTime[]>([]);
   const [selectedCountry, setSelectedCountry] = useState("IND");
@@ -28,27 +39,31 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [latestCRS, setLatestCRS] = useState<number | null>(null);
+  const [latestDrawDate, setLatestDrawDate] = useState<string | null>(null);
 
   const PAGE_SIZE = 20;
 
   useEffect(() => {
     async function fetchData() {
-      const { data: rows, error } = await supabase
-        .from("latest_processing_times")
-        .select("*");
-      if (error) { console.error(error); return; }
+      const [{ data: rows }, { data: draws }] = await Promise.all([
+        supabase.from("latest_processing_times").select("*"),
+        supabase.from("pr_draws").select("crs_score, draw_date").is("province", null).order("draw_date", { ascending: false }).limit(1),
+      ]);
       setData(rows || []);
       if (rows?.length) setLastUpdated(rows[0].fetched_at);
+      if (draws?.length) {
+        setLatestCRS(draws[0].crs_score);
+        setLatestDrawDate(draws[0].draw_date);
+      }
       setLoading(false);
     }
     fetchData();
   }, []);
 
-  // All unique countries sorted alphabetically
   const allCountries = [...new Map(data.map(r => [r.country_code, { code: r.country_code, name: r.country_name }])).values()]
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Filtered countries for search dropdown
   const filteredCountries = countrySearch.trim()
     ? allCountries.filter(c =>
         c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
@@ -56,15 +71,12 @@ export default function Home() {
       )
     : allCountries;
 
-  // Selected country info
   const selectedCountryName = allCountries.find(c => c.code === selectedCountry)?.name || selectedCountry;
 
-  // Cards for selected country
   const countryCards = data
     .filter(r => r.country_code === selectedCountry)
     .filter(r => selectedVisa === "all" || r.visa_type === selectedVisa);
 
-  // Full table (all countries)
   let tableData = data;
   if (selectedVisa !== "all") tableData = tableData.filter(r => r.visa_type === selectedVisa);
   if (sortBy === "alpha") tableData = [...tableData].sort((a, b) => a.country_name.localeCompare(b.country_name));
@@ -73,6 +85,15 @@ export default function Home() {
 
   const totalPages = Math.ceil(tableData.length / PAGE_SIZE);
   const paginated = tableData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const uniqueCountries = allCountries.length;
+  const uniqueVisaTypes = [...new Set(data.map(r => r.visa_type))].length;
+
+  function selectCountry(code: string) {
+    setSelectedCountry(code);
+    setCountrySearch("");
+    setShowCountryDropdown(false);
+  }
 
   return (
     <div className="canada-bg text-white">
@@ -99,12 +120,71 @@ export default function Home() {
           <div className="text-center py-32 text-gray-500">Loading processing times...</div>
         ) : (
           <>
+            {/* ── STATS BAR ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "Countries Tracked", value: uniqueCountries, icon: "🌍" },
+                { label: "Visa Types", value: uniqueVisaTypes, icon: "📋" },
+                { label: "Updated", value: "Daily", icon: "🔄" },
+                { label: "Latest CRS Cut-off", value: latestCRS ?? "—", icon: "🏆", href: "/draws" },
+              ].map((stat) => (
+                <a
+                  key={stat.label}
+                  href={stat.href || undefined}
+                  className="canada-card p-4 text-center block"
+                  style={{ textDecoration: "none", cursor: stat.href ? "pointer" : "default" }}
+                >
+                  <div className="text-xl mb-1">{stat.icon}</div>
+                  <div className="text-2xl font-bold text-white">{stat.value}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{stat.label}</div>
+                </a>
+              ))}
+            </div>
+
+            {/* ── LATEST DRAW TEASER ── */}
+            {latestCRS && latestDrawDate && (
+              <a href="/draws" style={{ textDecoration: "none" }}>
+                <div className="canada-card px-5 py-4 flex items-center justify-between gap-4 hover:border-red-500/40 transition-colors cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🗳</span>
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wide">Latest Express Entry Draw</p>
+                      <p className="text-white font-semibold text-sm mt-0.5">
+                        CRS Cut-off: <span className="text-yellow-400 text-lg font-bold">{latestCRS}</span>
+                        <span className="text-gray-400 font-normal ml-3">
+                          · {new Date(latestDrawDate).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-gray-400 text-sm whitespace-nowrap">View all draws →</span>
+                </div>
+              </a>
+            )}
+
             {/* ── HERO: Country Selector ── */}
             <section className="canada-card p-8 text-center">
               <h2 className="text-2xl font-bold mb-2">Check Processing Times For Your Country</h2>
-              <p className="text-gray-400 mb-6 text-sm">Select your country to instantly see all visa wait times and trends</p>
+              <p className="text-gray-400 mb-6 text-sm">
+                Select your country to instantly see all visa wait times and trends.
+                Processing times are in <span className="text-white">weeks</span> as reported by IRCC.
+              </p>
 
-              {/* Country search input */}
+              {/* Popular country quick-picks */}
+              <div className="flex flex-wrap justify-center gap-2 mb-5">
+                {POPULAR_COUNTRIES.map((c) => (
+                  <button
+                    key={c.code}
+                    onClick={() => selectCountry(c.code)}
+                    className={`canada-pill ${selectedCountry === c.code ? "active" : ""}`}
+                    style={{ fontSize: "12px", padding: "5px 14px" }}
+                  >
+                    {getFlagEmoji(c.code)} {c.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Country search dropdown */}
               <div className="relative max-w-md mx-auto">
                 <div
                   className="canada-input flex items-center gap-3 cursor-pointer py-3 px-4"
@@ -134,11 +214,7 @@ export default function Home() {
                     {filteredCountries.map((c) => (
                       <div
                         key={c.code}
-                        onClick={() => {
-                          setSelectedCountry(c.code);
-                          setCountrySearch("");
-                          setShowCountryDropdown(false);
-                        }}
+                        onClick={() => selectCountry(c.code)}
                         className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-white/5 text-sm ${selectedCountry === c.code ? "bg-red-900/30 text-white" : "text-gray-300"}`}
                       >
                         <span className="text-lg">{getFlagEmoji(c.code)}</span>
@@ -154,15 +230,15 @@ export default function Home() {
             </section>
 
             {/* ── SELECTED COUNTRY: Visa Cards ── */}
-            {countryCards.length > 0 && (
+            {countryCards.length > 0 ? (
               <section>
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                   <h2 className="section-title mb-0">
                     {getFlagEmoji(selectedCountry)} {selectedCountryName} — Processing Times
                   </h2>
-                  {/* Visa type filter */}
+                  {/* All visa type filters */}
                   <div className="flex flex-wrap gap-2">
-                    {VISA_TYPES.slice(0, 5).map((v) => (
+                    {VISA_TYPES.map((v) => (
                       <button
                         key={v.key}
                         onClick={() => setSelectedVisa(v.key)}
@@ -193,15 +269,28 @@ export default function Home() {
                   ))}
                 </div>
               </section>
+            ) : (
+              <div className="canada-card p-8 text-center text-gray-500 text-sm">
+                No processing time data available for {selectedCountryName} yet.
+              </div>
             )}
 
-            {/* ── TREND CHART for selected country ── */}
-            <section className="canada-card p-6">
-              <h2 className="section-title mb-4">
-                📈 Processing Time Trend — {getFlagEmoji(selectedCountry)} {selectedCountryName}
-              </h2>
-              <TrendChart countryCode={selectedCountry} visaType={selectedVisa} />
-            </section>
+            {/* ── TREND CHART ── only show if country has cards */}
+            {countryCards.length > 0 && (
+              <section className="canada-card p-6">
+                <h2 className="section-title mb-1">
+                  📈 Processing Time Trend — {getFlagEmoji(selectedCountry)} {selectedCountryName}
+                </h2>
+                <p className="text-xs text-gray-500 mb-4">Historical data builds up over time as the scraper runs daily</p>
+                <TrendChart countryCode={selectedCountry} visaType={selectedVisa} />
+              </section>
+            )}
+
+            {/* ── ALERT SIGNUP — moved up ── */}
+            <AlertSignup
+              visaTypes={VISA_TYPES.slice(1)}
+              countries={allCountries}
+            />
 
             {/* ── ALL COUNTRIES TABLE ── */}
             <section>
@@ -296,12 +385,6 @@ export default function Home() {
                 </div>
               )}
             </section>
-
-            {/* Alert Signup */}
-            <AlertSignup
-              visaTypes={VISA_TYPES.slice(1)}
-              countries={allCountries}
-            />
           </>
         )}
       </main>
