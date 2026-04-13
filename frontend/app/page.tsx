@@ -22,6 +22,7 @@ export default function Home() {
   const [filtered, setFiltered] = useState<ProcessingTime[]>([]);
   const [selectedVisa, setSelectedVisa] = useState("all");
   const [selectedCountry, setSelectedCountry] = useState("IND");
+  const [countrySearch, setCountrySearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
@@ -48,8 +49,16 @@ export default function Home() {
     if (selectedVisa !== "all") {
       result = result.filter((r) => r.visa_type === selectedVisa);
     }
+    if (countrySearch.trim()) {
+      const q = countrySearch.toLowerCase();
+      result = result.filter(
+        (r) =>
+          r.country_name.toLowerCase().includes(q) ||
+          r.country_code.toLowerCase().includes(q)
+      );
+    }
     setFiltered(result);
-  }, [data, selectedVisa]);
+  }, [data, selectedVisa, countrySearch]);
 
   const indiaRows = filtered.filter((r) => r.country_code === "IND");
   const allCountries = [...new Set(data.map((r) => r.country_code))].sort();
@@ -150,7 +159,21 @@ export default function Home() {
 
             {/* Full Table */}
             <section>
-              <h2 className="text-lg font-semibold mb-3">All Processing Times</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">All Processing Times</h2>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search country..."
+                    value={countrySearch}
+                    onChange={(e) => setCountrySearch(e.target.value)}
+                    className="bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500 w-48"
+                  />
+                  <svg className="absolute left-2.5 top-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                  </svg>
+                </div>
+              </div>
               <div className="overflow-x-auto rounded-xl border border-gray-800">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-900 text-gray-400 uppercase text-xs">
@@ -161,7 +184,7 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
-                    {filtered.slice(0, 50).map((row, i) => (
+                    {filtered.map((row, i) => (
                       <tr key={i} className="bg-gray-950 hover:bg-gray-900 transition-colors">
                         <td className="px-4 py-3">{row.visa_label}</td>
                         <td className="px-4 py-3 text-gray-300">{row.country_name}</td>
