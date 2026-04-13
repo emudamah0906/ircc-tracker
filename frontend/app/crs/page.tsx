@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import Header from "@/components/Header";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -522,24 +523,7 @@ export default function CRSCalculatorPage() {
 
   return (
     <div className="canada-bg text-white">
-      {/* Header */}
-      <header className="canada-header px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-white">🍁 IRCC Tracker</h1>
-          <p className="text-sm text-gray-400 mt-0.5">CRS Score Calculator</p>
-        </div>
-        <nav className="flex items-center gap-3">
-          <a href="/" className="text-gray-400 hover:text-white text-sm transition-colors">
-            Processing Times
-          </a>
-          <a href="/draws" className="text-gray-400 hover:text-white text-sm transition-colors">
-            PR Draws
-          </a>
-          <span className="canada-pill active text-xs">CRS Calc</span>
-        </nav>
-      </header>
-
-      <div className="canada-topbar" />
+      <Header subtitle="CRS Score Calculator" activeNav="crs" />
 
       <main
         className="max-w-6xl mx-auto px-4 py-8 space-y-6"

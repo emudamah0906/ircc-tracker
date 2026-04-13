@@ -5,6 +5,7 @@ import { supabase, ProcessingTime } from "@/lib/supabase";
 import { getFlagEmoji } from "@/lib/countries";
 import TrendChart from "@/components/TrendChart";
 import AlertSignup from "@/components/AlertSignup";
+import Header from "@/components/Header";
 
 const VISA_TYPES = [
   { key: "all", label: "All Types" },
@@ -97,22 +98,7 @@ export default function Home() {
 
   return (
     <div className="canada-bg text-white">
-      {/* Header */}
-      <header className="canada-header px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">🍁 IRCC Tracker</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Canada immigration wait times — updated daily</p>
-        </div>
-        <nav className="flex items-center gap-2">
-          <a href="/draws" className="canada-pill">🗳 PR Draws</a>
-          <a href="/crs" className="canada-pill">🧮 CRS Score</a>
-          {lastUpdated && (
-            <span className="text-xs text-gray-500 hidden md:block ml-2">
-              Updated: {new Date(lastUpdated).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}
-            </span>
-          )}
-        </nav>
-      </header>
+      <Header activeNav="processing" lastUpdated={lastUpdated} />
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8" style={{ position: "relative", zIndex: 1 }}>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Header from "@/components/Header";
 
 type Draw = {
   id: number;
@@ -82,17 +83,7 @@ export default function DrawsPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <div>
-          <a href="/" className="text-xl font-bold">🍁 IRCC Tracker</a>
-          <p className="text-sm text-gray-400 mt-0.5">PR Draws — Express Entry & Provincial</p>
-        </div>
-        <nav className="flex gap-4 text-sm">
-          <a href="/" className="text-gray-400 hover:text-white">Processing Times</a>
-          <a href="/draws" className="text-white font-semibold">PR Draws</a>
-        </nav>
-      </header>
+      <Header subtitle="PR Draws — Express Entry & Provincial" activeNav="draws" />
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
 
