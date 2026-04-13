@@ -75,7 +75,14 @@ export default function Home() {
             Canada immigration wait times — updated daily
           </p>
         </div>
-        {lastUpdated && (
+        <div className="flex items-center gap-4">
+          <a
+            href="/pricing"
+            className="bg-red-600 hover:bg-red-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            Get Premium Alerts
+          </a>
+          {lastUpdated && (
           <span className="text-xs text-gray-500">
             Last updated:{" "}
             {new Date(lastUpdated).toLocaleDateString("en-CA", {
@@ -84,7 +91,8 @@ export default function Home() {
               year: "numeric",
             })}
           </span>
-        )}
+          )}
+        </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
