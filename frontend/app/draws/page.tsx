@@ -96,6 +96,54 @@ export default function DrawsPage() {
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
 
+        {/* Next Draw Countdown */}
+        {latestDraw && (() => {
+          const latestDate = new Date(latestDraw.draw_date);
+          const nextExpected = new Date(latestDate);
+          nextExpected.setDate(nextExpected.getDate() + 14);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          nextExpected.setHours(0, 0, 0, 0);
+          const diffMs = nextExpected.getTime() - today.getTime();
+          const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+          const isOverdue = daysRemaining <= 0;
+          return (
+            <div style={{
+              background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
+              border: '1px solid #374151',
+              borderLeft: '4px solid #dc2626',
+              borderRadius: '12px',
+              padding: '20px 24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '20px',
+              flexWrap: 'wrap',
+            }}>
+              <div style={{ fontSize: '2rem' }}>🍁</div>
+              <div>
+                <p style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>
+                  Next Federal Draw
+                </p>
+                {isOverdue ? (
+                  <p style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f87171', margin: '4px 0 0' }}>
+                    Draw expected any day now!
+                  </p>
+                ) : (
+                  <p style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ffffff', margin: '4px 0 0' }}>
+                    Expected in{' '}
+                    <span style={{ color: '#dc2626', fontSize: '1.75rem' }}>{daysRemaining}</span>
+                    {' '}{daysRemaining === 1 ? 'day' : 'days'}
+                  </p>
+                )}
+                <p style={{ fontSize: '11px', color: '#6b7280', margin: '4px 0 0' }}>
+                  Based on 14-day draw cycle · Last draw{' '}
+                  {latestDate.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* CRS Stats */}
         {latestDraw && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "IRCC Processing Times Tracker | Canada Immigration Wait Times",
   description: "Track Canada immigration processing times updated daily. Check wait times for visitor visa, work permit, study permit, PR and more. Get email alerts when times change.",
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({
