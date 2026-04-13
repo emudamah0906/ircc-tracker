@@ -14,12 +14,40 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "IRCC Processing Times Tracker | Canada Immigration Wait Times",
-  description: "Track Canada immigration processing times updated daily. Check wait times for visitor visa, work permit, study permit, PR and more. Get email alerts when times change.",
+  title: "IRCC Processing Times Tracker | Canada Immigration Wait Times 2025",
+  description:
+    "Track Canada immigration processing times updated daily. Check wait times for visitor visa, work permit, study permit, Express Entry PR and more. Free tools: CRS calculator, PR pathway finder, permit tracker.",
+  keywords:
+    "IRCC processing times, Canada immigration wait times, express entry draw, CRS calculator, work permit processing, study permit Canada, visitor visa Canada, PR tracker",
+  authors: [{ name: "IRCC Tracker" }],
+  metadataBase: new URL("https://ircctracker.org"),
+  openGraph: {
+    title: "IRCC Tracker | Canada Immigration Processing Times & Tools",
+    description:
+      "Live Canada immigration processing times + free tools: CRS calculator, PR pathway finder, permit expiry tracker, proof of funds calculator.",
+    url: "https://ircctracker.org",
+    siteName: "IRCC Tracker",
+    type: "website",
+    locale: "en_CA",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "IRCC Tracker | Canada Immigration Processing Times",
+    description:
+      "Live Canada immigration processing times + CRS calculator, PR pathway finder, and permit tracker. Updated daily.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
-    apple: '/favicon.svg',
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
+  alternates: {
+    canonical: "https://ircctracker.org",
   },
 };
 
@@ -44,6 +72,27 @@ export default function RootLayout({
         <div className="canada-topbar" />
         {children}
         <FeedbackButton />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "IRCC Tracker",
+              url: "https://ircctracker.org",
+              description:
+                "Track Canada immigration processing times and use free tools: CRS calculator, PR pathway finder, permit expiry tracker, proof of funds calculator.",
+              potentialAction: {
+                "@type": "SearchAction",
+                target: {
+                  "@type": "EntryPoint",
+                  urlTemplate: "https://ircctracker.org/?country={search_term_string}",
+                },
+                "query-input": "required name=search_term_string",
+              },
+            }),
+          }}
+        />
       </body>
     </html>
   );
