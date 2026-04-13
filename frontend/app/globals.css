@@ -168,6 +168,54 @@ body {
   margin-bottom: 12px;
 }
 
+/* ── Mobile: convert table to cards ─────────────────────────────────────── */
+@media (max-width: 640px) {
+  .canada-table thead {
+    display: none;
+  }
+
+  .canada-table table,
+  .canada-table tbody,
+  .canada-table tr,
+  .canada-table td {
+    display: block;
+    width: 100%;
+  }
+
+  /* Each country group becomes a card */
+  .canada-table tbody tr:first-of-type,
+  .canada-table tbody tr[data-first="true"] {
+    margin-top: 12px;
+    border-top: 2px solid rgba(213,43,30,0.3) !important;
+    padding-top: 8px;
+  }
+
+  .canada-table td {
+    padding: 4px 16px;
+    border: none !important;
+    text-align: left !important;
+  }
+
+  /* Hide the # column on mobile */
+  .canada-table td:first-child {
+    display: none;
+  }
+
+  /* Country name: bigger, shown as card header */
+  .canada-table td[rowspan] {
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 16px 4px;
+    color: #f0f4ff;
+  }
+
+  /* Wait time: show inline with label */
+  .canada-table td:last-child {
+    text-align: left !important;
+    padding-bottom: 6px;
+  }
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
