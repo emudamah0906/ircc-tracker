@@ -34,7 +34,10 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <div className="canada-topbar" />
+        {children}
+      </body>
     </html>
   );
 }

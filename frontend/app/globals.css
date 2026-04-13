@@ -1,26 +1,185 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #0a0f1e;
+  --foreground: #f0f4ff;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Canada-themed animated background */
+.canada-bg {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(255, 0, 0, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(180, 0, 0, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 60% 80%, rgba(255, 30, 30, 0.05) 0%, transparent 50%),
+    linear-gradient(135deg, #060d1f 0%, #0d1b35 40%, #0a0f1e 100%);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Subtle maple leaf watermark */
+.canada-bg::before {
+  content: "🍁";
+  position: fixed;
+  bottom: -80px;
+  right: -60px;
+  font-size: 400px;
+  opacity: 0.025;
+  pointer-events: none;
+  z-index: 0;
+  line-height: 1;
+  transform: rotate(-15deg);
+}
+
+/* Canada flag top bar */
+.canada-topbar {
+  background: linear-gradient(90deg, #d52b1e 0%, #c41a0d 30%, #ffffff 30%, #ffffff 70%, #c41a0d 70%, #d52b1e 100%);
+  height: 4px;
+  width: 100%;
+}
+
+/* Card styles */
+.canada-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  border-radius: 16px;
+  transition: border-color 0.2s;
+}
+
+.canada-card:hover {
+  border-color: rgba(213, 43, 30, 0.3);
+}
+
+/* Header gradient */
+.canada-header {
+  background: rgba(6, 13, 31, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+/* Stat cards */
+.stat-card {
+  background: linear-gradient(135deg, rgba(213, 43, 30, 0.12) 0%, rgba(255,255,255,0.04) 100%);
+  border: 1px solid rgba(213, 43, 30, 0.2);
+  border-radius: 16px;
+  padding: 20px;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(213, 43, 30, 0.4);
+}
+
+/* Red accent button */
+.canada-btn {
+  background: linear-gradient(135deg, #d52b1e, #a01208);
+  color: white;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 10px 20px;
+  transition: opacity 0.2s, transform 0.2s;
+  border: none;
+  cursor: pointer;
+}
+
+.canada-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* Pill filters */
+.canada-pill {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #94a3b8;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.canada-pill:hover {
+  background: rgba(213, 43, 30, 0.15);
+  border-color: rgba(213, 43, 30, 0.3);
+  color: #fff;
+}
+
+.canada-pill.active {
+  background: linear-gradient(135deg, #d52b1e, #a01208);
+  border-color: transparent;
+  color: white;
+}
+
+/* Table */
+.canada-table {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.canada-table thead {
+  background: rgba(213, 43, 30, 0.1);
+}
+
+.canada-table tr:hover td {
+  background: rgba(255,255,255,0.03);
+}
+
+/* Input fields */
+.canada-input {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  color: white;
+  padding: 10px 14px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+  outline: none;
+  width: 100%;
+}
+
+.canada-input:focus {
+  border-color: rgba(213, 43, 30, 0.6);
+}
+
+.canada-input::placeholder {
+  color: #64748b;
+}
+
+/* Section heading */
+.section-title {
+  color: #f0f4ff;
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0f1e;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(213, 43, 30, 0.4);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(213, 43, 30, 0.7);
 }

@@ -34,10 +34,7 @@ export default function Home() {
         .select("*")
         .order("processing_weeks", { ascending: true });
 
-      if (error) {
-        console.error(error);
-        return;
-      }
+      if (error) { console.error(error); return; }
       setData(rows || []);
       if (rows?.length) setLastUpdated(rows[0].fetched_at);
       setLoading(false);
@@ -47,15 +44,11 @@ export default function Home() {
 
   useEffect(() => {
     let result = data;
-    if (selectedVisa !== "all") {
-      result = result.filter((r) => r.visa_type === selectedVisa);
-    }
+    if (selectedVisa !== "all") result = result.filter((r) => r.visa_type === selectedVisa);
     if (countrySearch.trim()) {
       const q = countrySearch.toLowerCase();
       result = result.filter(
-        (r) =>
-          r.country_name.toLowerCase().includes(q) ||
-          r.country_code.toLowerCase().includes(q)
+        (r) => r.country_name.toLowerCase().includes(q) || r.country_code.toLowerCase().includes(q)
       );
     }
     setFiltered(result);
@@ -65,46 +58,32 @@ export default function Home() {
   const allCountries = [...new Set(data.map((r) => r.country_code))].sort();
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="canada-bg text-white">
       {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+      <header className="canada-header px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">
-            🍁 IRCC Processing Times
-          </h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            Canada immigration wait times — updated daily
-          </p>
+          <h1 className="text-2xl font-bold text-white">🍁 IRCC Processing Times</h1>
+          <p className="text-sm text-gray-400 mt-0.5">Canada immigration wait times — updated daily</p>
         </div>
-        <div className="flex items-center gap-4">
-          <a href="/draws" className="bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-            PR Draws
-          </a>
+        <div className="flex items-center gap-3">
+          <a href="/draws" className="canada-btn text-sm">🗳 PR Draws</a>
           {lastUpdated && (
-          <span className="text-xs text-gray-500">
-            Last updated:{" "}
-            {new Date(lastUpdated).toLocaleDateString("en-CA", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
-          </span>
+            <span className="text-xs text-gray-500 hidden sm:block">
+              Updated: {new Date(lastUpdated).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}
+            </span>
           )}
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8" style={{ position: "relative", zIndex: 1 }}>
+
         {/* Visa filter pills */}
         <div className="flex flex-wrap gap-2">
           {VISA_TYPES.map((v) => (
             <button
               key={v.key}
               onClick={() => setSelectedVisa(v.key)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                selectedVisa === v.key
-                  ? "bg-red-600 text-white"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-              }`}
+              className={`canada-pill ${selectedVisa === v.key ? "active" : ""}`}
             >
               {v.label}
             </button>
@@ -112,31 +91,20 @@ export default function Home() {
         </div>
 
         {loading ? (
-          <div className="text-center py-20 text-gray-500">
-            Loading processing times...
-          </div>
+          <div className="text-center py-20 text-gray-500">Loading processing times...</div>
         ) : (
           <>
             {/* India Spotlight */}
             {indiaRows.length > 0 && (
               <section>
-                <h2 className="text-lg font-semibold mb-3 text-orange-400">
-                  🇮🇳 India Processing Times
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <h2 className="section-title">🇮🇳 India Processing Times</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {indiaRows.map((row) => (
-                    <div
-                      key={row.visa_type}
-                      className="bg-gray-900 border border-gray-800 rounded-xl p-4"
-                    >
-                      <p className="text-xs text-gray-400 uppercase tracking-wide">
-                        {row.visa_label}
-                      </p>
-                      <p className="text-3xl font-bold mt-1">
+                    <div key={row.visa_type} className="stat-card">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide">{row.visa_label}</p>
+                      <p className="text-3xl font-bold mt-2 text-white">
                         {row.processing_weeks}
-                        <span className="text-base font-normal text-gray-400 ml-1">
-                          {row.unit}
-                        </span>
+                        <span className="text-sm font-normal text-gray-400 ml-1">{row.unit}</span>
                       </p>
                     </div>
                   ))}
@@ -145,13 +113,13 @@ export default function Home() {
             )}
 
             {/* Trend Chart */}
-            <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+            <section className="canada-card p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Processing Time Trend</h2>
+                <h2 className="section-title mb-0">📈 Processing Time Trend</h2>
                 <select
                   value={selectedCountry}
                   onChange={(e) => setSelectedCountry(e.target.value)}
-                  className="bg-gray-800 border border-gray-700 text-sm rounded px-2 py-1 text-white"
+                  className="canada-input w-48 py-1.5"
                 >
                   {allCountries.map((c) => (
                     <option key={c} value={c}>
@@ -166,47 +134,45 @@ export default function Home() {
             {/* Full Table */}
             <section>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-semibold">All Processing Times</h2>
+                <h2 className="section-title mb-0">🌍 All Processing Times</h2>
                 <div className="relative">
                   <input
                     type="text"
                     placeholder="Search country..."
                     value={countrySearch}
                     onChange={(e) => setCountrySearch(e.target.value)}
-                    className="bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500 w-48"
+                    className="canada-input pl-8 py-1.5 w-48"
                   />
                   <svg className="absolute left-2.5 top-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
                   </svg>
                 </div>
               </div>
-              <div className="overflow-x-auto rounded-xl border border-gray-800">
+              <div className="canada-table overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-900 text-gray-400 uppercase text-xs">
+                  <thead className="text-gray-400 uppercase text-xs">
                     <tr>
                       <th className="px-4 py-3 text-left">Visa Type</th>
                       <th className="px-4 py-3 text-left">Country</th>
                       <th className="px-4 py-3 text-right">Wait Time</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-800">
+                  <tbody className="divide-y divide-white/5">
                     {filtered.map((row, i) => (
-                      <tr key={i} className="bg-gray-950 hover:bg-gray-900 transition-colors">
-                        <td className="px-4 py-3">{row.visa_label}</td>
+                      <tr key={i} className="transition-colors">
+                        <td className="px-4 py-3 text-gray-200">{row.visa_label}</td>
                         <td className="px-4 py-3 text-gray-300">
                           <span className="mr-2">{getFlagEmoji(row.country_code)}</span>
                           {row.country_name || row.country_code}
                         </td>
                         <td className="px-4 py-3 text-right font-mono">
-                          <span
-                            className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                              row.processing_weeks <= 4
-                                ? "bg-green-900 text-green-300"
-                                : row.processing_weeks <= 12
-                                ? "bg-yellow-900 text-yellow-300"
-                                : "bg-red-900 text-red-300"
-                            }`}
-                          >
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                            row.processing_weeks <= 30
+                              ? "bg-green-900/60 text-green-300"
+                              : row.processing_weeks <= 90
+                              ? "bg-yellow-900/60 text-yellow-300"
+                              : "bg-red-900/60 text-red-300"
+                          }`}>
                             {row.processing_weeks} {row.unit}
                           </span>
                         </td>
@@ -228,6 +194,10 @@ export default function Home() {
           </>
         )}
       </main>
+
+      <footer className="text-center py-6 text-gray-600 text-xs" style={{ position: "relative", zIndex: 1 }}>
+        🍁 ircctracker.org — Not affiliated with IRCC or the Government of Canada
+      </footer>
     </div>
   );
 }
