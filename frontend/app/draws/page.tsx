@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Header from "@/components/Header";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, ReferenceLine,
+} from "recharts";
 
 type Draw = {
   id: number;
@@ -161,6 +165,56 @@ export default function DrawsPage() {
             </div>
           </div>
         )}
+
+        {/* CRS Trend Chart */}
+        {draws.filter(d => d.province === null && d.crs_score).length >= 2 && (() => {
+          const federalDraws = draws
+            .filter(d => d.province === null && d.crs_score)
+            .slice(0, 20)
+            .reverse();
+          const chartData = federalDraws.map(d => ({
+            date: new Date(d.draw_date).toLocaleDateString("en-CA", { month: "short", day: "numeric" }),
+            crs: d.crs_score,
+            invitations: d.invitations,
+          }));
+          const scores = federalDraws.map(d => d.crs_score as number);
+          const minScore = Math.min(...scores) - 10;
+          const maxScore = Math.max(...scores) + 10;
+          const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+          return (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-base font-semibold">📈 CRS Cut-off Trend</h2>
+                <span className="text-xs text-gray-500">Last {federalDraws.length} federal draws</span>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">
+                Average cut-off: <span className="text-yellow-400 font-semibold">{avg}</span>
+                {scores[scores.length - 1] > avg
+                  ? <span className="text-red-400 ml-2">↑ Currently above average</span>
+                  : <span className="text-green-400 ml-2">↓ Currently below average</span>}
+              </p>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                  <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 11 }} />
+                  <YAxis domain={[minScore, maxScore]} tick={{ fill: "#6b7280", fontSize: 11 }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#111827", border: "1px solid #374151", color: "#f9fafb", fontSize: 12 }}
+                    formatter={(val, name) =>
+                      name === "crs" ? [val, "CRS Cut-off"] : [Number(val).toLocaleString(), "Invitations"]
+                    }
+                  />
+                  <ReferenceLine y={avg} stroke="#6b7280" strokeDasharray="4 4"
+                    label={{ value: `Avg ${avg}`, fill: "#6b7280", fontSize: 10, position: "insideTopRight" }} />
+                  <Line
+                    type="monotone" dataKey="crs" stroke="#eab308"
+                    strokeWidth={2.5} dot={{ fill: "#eab308", r: 3 }} activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          );
+        })()}
 
         {/* Filter Pills */}
         <div className="flex flex-wrap gap-2">

@@ -137,7 +137,7 @@ export default function AlertSignup({
                 onChange={(e) => setCountryCode(e.target.value)}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
               >
-                {countries.slice(0, 50).map((c) => (
+                {countries.map((c) => (
                   <option key={c.code} value={c.code}>
                     {getFlagEmoji(c.code)} {c.name}
                   </option>
