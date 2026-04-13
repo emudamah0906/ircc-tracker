@@ -76,12 +76,6 @@ export default function Home() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <a
-            href="/pricing"
-            className="bg-red-600 hover:bg-red-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            Get Premium Alerts
-          </a>
           {lastUpdated && (
           <span className="text-xs text-gray-500">
             Last updated:{" "}

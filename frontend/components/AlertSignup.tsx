@@ -53,9 +53,9 @@ export default function AlertSignup({
 
   return (
     <section className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-      <h2 className="text-lg font-semibold mb-1">Get Alerted When Times Change</h2>
+      <h2 className="text-lg font-semibold mb-1">Get Alerted When Times Change — Free</h2>
       <p className="text-sm text-gray-400 mb-4">
-        We&apos;ll notify you by email or SMS when processing times change for your visa type.
+        Enter your email and/or phone number. We&apos;ll notify you for free when processing times change.
       </p>
 
       {submitted ? (
