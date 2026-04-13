@@ -20,14 +20,14 @@ const VISA_TYPES = [
 
 export default function Home() {
   const [data, setData] = useState<ProcessingTime[]>([]);
-  const [filtered, setFiltered] = useState<ProcessingTime[]>([]);
-  const [selectedVisa, setSelectedVisa] = useState("all");
   const [selectedCountry, setSelectedCountry] = useState("IND");
   const [countrySearch, setCountrySearch] = useState("");
+  const [selectedVisa, setSelectedVisa] = useState("all");
   const [sortBy, setSortBy] = useState<"alpha" | "fastest" | "slowest">("alpha");
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
 
   const PAGE_SIZE = 20;
 
@@ -36,7 +36,6 @@ export default function Home() {
       const { data: rows, error } = await supabase
         .from("latest_processing_times")
         .select("*");
-
       if (error) { console.error(error); return; }
       setData(rows || []);
       if (rows?.length) setLastUpdated(rows[0].fetched_at);
@@ -45,140 +44,189 @@ export default function Home() {
     fetchData();
   }, []);
 
-  useEffect(() => {
-    let result = data;
-    if (selectedVisa !== "all") result = result.filter((r) => r.visa_type === selectedVisa);
-    if (countrySearch.trim()) {
-      const q = countrySearch.toLowerCase();
-      result = result.filter(
-        (r) => r.country_name.toLowerCase().includes(q) || r.country_code.toLowerCase().includes(q)
-      );
-    }
-    // Sort
-    if (sortBy === "alpha") {
-      result = [...result].sort((a, b) => a.country_name.localeCompare(b.country_name));
-    } else if (sortBy === "fastest") {
-      result = [...result].sort((a, b) => a.processing_weeks - b.processing_weeks);
-    } else {
-      result = [...result].sort((a, b) => b.processing_weeks - a.processing_weeks);
-    }
-    setFiltered(result);
-    setCurrentPage(1); // reset to page 1 on filter change
-  }, [data, selectedVisa, countrySearch, sortBy]);
+  // All unique countries sorted alphabetically
+  const allCountries = [...new Map(data.map(r => [r.country_code, { code: r.country_code, name: r.country_name }])).values()]
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const indiaRows = data.filter((r) => r.country_code === "IND");
-  const allCountries = [...new Set(data.map((r) => r.country_code))].sort();
+  // Filtered countries for search dropdown
+  const filteredCountries = countrySearch.trim()
+    ? allCountries.filter(c =>
+        c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+        c.code.toLowerCase().includes(countrySearch.toLowerCase())
+      )
+    : allCountries;
+
+  // Selected country info
+  const selectedCountryName = allCountries.find(c => c.code === selectedCountry)?.name || selectedCountry;
+
+  // Cards for selected country
+  const countryCards = data
+    .filter(r => r.country_code === selectedCountry)
+    .filter(r => selectedVisa === "all" || r.visa_type === selectedVisa);
+
+  // Full table (all countries)
+  let tableData = data;
+  if (selectedVisa !== "all") tableData = tableData.filter(r => r.visa_type === selectedVisa);
+  if (sortBy === "alpha") tableData = [...tableData].sort((a, b) => a.country_name.localeCompare(b.country_name));
+  else if (sortBy === "fastest") tableData = [...tableData].sort((a, b) => a.processing_weeks - b.processing_weeks);
+  else tableData = [...tableData].sort((a, b) => b.processing_weeks - a.processing_weeks);
+
+  const totalPages = Math.ceil(tableData.length / PAGE_SIZE);
+  const paginated = tableData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="canada-bg text-white">
       {/* Header */}
       <header className="canada-header px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">🍁 IRCC Processing Times</h1>
+          <h1 className="text-2xl font-bold text-white">🍁 IRCC Tracker</h1>
           <p className="text-sm text-gray-400 mt-0.5">Canada immigration wait times — updated daily</p>
         </div>
-        <div className="flex items-center gap-3">
-          <a href="/draws" className="canada-btn text-sm">🗳 PR Draws</a>
+        <nav className="flex items-center gap-2">
+          <a href="/draws" className="canada-pill">🗳 PR Draws</a>
+          <a href="/crs" className="canada-pill">🧮 CRS Score</a>
           {lastUpdated && (
-            <span className="text-xs text-gray-500 hidden sm:block">
+            <span className="text-xs text-gray-500 hidden md:block ml-2">
               Updated: {new Date(lastUpdated).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}
             </span>
           )}
-        </div>
+        </nav>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8" style={{ position: "relative", zIndex: 1 }}>
 
-        {/* Visa filter pills */}
-        <div className="flex flex-wrap gap-2">
-          {VISA_TYPES.map((v) => (
-            <button
-              key={v.key}
-              onClick={() => setSelectedVisa(v.key)}
-              className={`canada-pill ${selectedVisa === v.key ? "active" : ""}`}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
-
         {loading ? (
-          <div className="text-center py-20 text-gray-500">Loading processing times...</div>
+          <div className="text-center py-32 text-gray-500">Loading processing times...</div>
         ) : (
           <>
-            {/* India Spotlight */}
-            {indiaRows.length > 0 && (
+            {/* ── HERO: Country Selector ── */}
+            <section className="canada-card p-8 text-center">
+              <h2 className="text-2xl font-bold mb-2">Check Processing Times For Your Country</h2>
+              <p className="text-gray-400 mb-6 text-sm">Select your country to instantly see all visa wait times and trends</p>
+
+              {/* Country search input */}
+              <div className="relative max-w-md mx-auto">
+                <div
+                  className="canada-input flex items-center gap-3 cursor-pointer py-3 px-4"
+                  onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                >
+                  <span className="text-2xl">{getFlagEmoji(selectedCountry)}</span>
+                  <span className="flex-1 text-left font-medium">{selectedCountryName}</span>
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+
+                {showCountryDropdown && (
+                  <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-white/10 overflow-hidden z-50"
+                    style={{ background: "#0d1b35", maxHeight: "300px", overflowY: "auto" }}>
+                    <div className="p-2 sticky top-0" style={{ background: "#0d1b35" }}>
+                      <input
+                        type="text"
+                        placeholder="Search country..."
+                        value={countrySearch}
+                        onChange={(e) => setCountrySearch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        autoFocus
+                        className="canada-input py-2 text-sm"
+                      />
+                    </div>
+                    {filteredCountries.map((c) => (
+                      <div
+                        key={c.code}
+                        onClick={() => {
+                          setSelectedCountry(c.code);
+                          setCountrySearch("");
+                          setShowCountryDropdown(false);
+                        }}
+                        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-white/5 text-sm ${selectedCountry === c.code ? "bg-red-900/30 text-white" : "text-gray-300"}`}
+                      >
+                        <span className="text-lg">{getFlagEmoji(c.code)}</span>
+                        <span>{c.name}</span>
+                      </div>
+                    ))}
+                    {filteredCountries.length === 0 && (
+                      <p className="text-center text-gray-500 py-4 text-sm">No countries found</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* ── SELECTED COUNTRY: Visa Cards ── */}
+            {countryCards.length > 0 && (
               <section>
-                <h2 className="section-title">🇮🇳 India Processing Times</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {indiaRows.map((row) => (
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="section-title mb-0">
+                    {getFlagEmoji(selectedCountry)} {selectedCountryName} — Processing Times
+                  </h2>
+                  {/* Visa type filter */}
+                  <div className="flex flex-wrap gap-2">
+                    {VISA_TYPES.slice(0, 5).map((v) => (
+                      <button
+                        key={v.key}
+                        onClick={() => setSelectedVisa(v.key)}
+                        className={`canada-pill ${selectedVisa === v.key ? "active" : ""}`}
+                        style={{ fontSize: "11px", padding: "4px 12px" }}
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {countryCards.map((row) => (
                     <div key={row.visa_type} className="stat-card">
                       <p className="text-xs text-gray-400 uppercase tracking-wide">{row.visa_label}</p>
                       <p className="text-3xl font-bold mt-2 text-white">
                         {row.processing_weeks}
                         <span className="text-sm font-normal text-gray-400 ml-1">{row.unit}</span>
                       </p>
+                      <div className={`mt-2 text-xs font-semibold ${
+                        row.processing_weeks <= 30 ? "text-green-400" :
+                        row.processing_weeks <= 90 ? "text-yellow-400" : "text-red-400"
+                      }`}>
+                        {row.processing_weeks <= 30 ? "✓ Fast" : row.processing_weeks <= 90 ? "⚠ Moderate" : "✕ Slow"}
+                      </div>
                     </div>
                   ))}
                 </div>
               </section>
             )}
 
-            {/* Trend Chart */}
+            {/* ── TREND CHART for selected country ── */}
             <section className="canada-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="section-title mb-0">📈 Processing Time Trend</h2>
-                <select
-                  value={selectedCountry}
-                  onChange={(e) => setSelectedCountry(e.target.value)}
-                  className="canada-input w-48 py-1.5"
-                >
-                  {allCountries.map((c) => (
-                    <option key={c} value={c}>
-                      {getFlagEmoji(c)} {data.find((r) => r.country_code === c)?.country_name || c}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <h2 className="section-title mb-4">
+                📈 Processing Time Trend — {getFlagEmoji(selectedCountry)} {selectedCountryName}
+              </h2>
               <TrendChart countryCode={selectedCountry} visaType={selectedVisa} />
             </section>
 
-            {/* Full Table */}
+            {/* ── ALL COUNTRIES TABLE ── */}
             <section>
-              {/* Controls */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
                 <h2 className="section-title mb-0">
-                  🌍 All Processing Times
-                  <span className="text-sm font-normal text-gray-500 ml-2">
-                    ({filtered.length} results)
-                  </span>
+                  🌍 All Countries
+                  <span className="text-sm font-normal text-gray-500 ml-2">({tableData.length} results)</span>
                 </h2>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Sort */}
+                  <select
+                    value={selectedVisa}
+                    onChange={(e) => { setSelectedVisa(e.target.value); setCurrentPage(1); }}
+                    className="canada-input py-1.5 text-xs w-36"
+                  >
+                    {VISA_TYPES.map(v => <option key={v.key} value={v.key}>{v.label}</option>)}
+                  </select>
                   <select
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as "alpha" | "fastest" | "slowest")}
+                    onChange={(e) => { setSortBy(e.target.value as "alpha" | "fastest" | "slowest"); setCurrentPage(1); }}
                     className="canada-input py-1.5 text-xs w-36"
                   >
                     <option value="alpha">A → Z Country</option>
                     <option value="fastest">Fastest First</option>
                     <option value="slowest">Slowest First</option>
                   </select>
-                  {/* Search */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search country..."
-                      value={countrySearch}
-                      onChange={(e) => setCountrySearch(e.target.value)}
-                      className="canada-input pl-8 py-1.5 w-44"
-                    />
-                    <svg className="absolute left-2.5 top-2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-                    </svg>
-                  </div>
                 </div>
               </div>
 
@@ -194,10 +242,12 @@ export default function Home() {
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {paginated.map((row, i) => (
-                      <tr key={i} className="transition-colors">
-                        <td className="px-4 py-3 text-gray-600 text-xs">
-                          {(currentPage - 1) * PAGE_SIZE + i + 1}
-                        </td>
+                      <tr
+                        key={i}
+                        className={`transition-colors cursor-pointer ${row.country_code === selectedCountry ? "bg-red-900/10" : ""}`}
+                        onClick={() => { setSelectedCountry(row.country_code); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                      >
+                        <td className="px-4 py-3 text-gray-600 text-xs">{(currentPage - 1) * PAGE_SIZE + i + 1}</td>
                         <td className="px-4 py-3 text-gray-200 font-medium">
                           <span className="mr-2">{getFlagEmoji(row.country_code)}</span>
                           {row.country_name || row.country_code}
@@ -205,11 +255,9 @@ export default function Home() {
                         <td className="px-4 py-3 text-gray-400">{row.visa_label}</td>
                         <td className="px-4 py-3 text-right font-mono">
                           <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                            row.processing_weeks <= 30
-                              ? "bg-green-900/60 text-green-300"
-                              : row.processing_weeks <= 90
-                              ? "bg-yellow-900/60 text-yellow-300"
-                              : "bg-red-900/60 text-red-300"
+                            row.processing_weeks <= 30 ? "bg-green-900/60 text-green-300"
+                            : row.processing_weeks <= 90 ? "bg-yellow-900/60 text-yellow-300"
+                            : "bg-red-900/60 text-red-300"
                           }`}>
                             {row.processing_weeks} {row.unit}
                           </span>
@@ -224,43 +272,26 @@ export default function Home() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4">
                   <p className="text-xs text-gray-500">
-                    Page {currentPage} of {totalPages} · Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+                    Page {currentPage} of {totalPages} · {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, tableData.length)} of {tableData.length}
                   </p>
                   <div className="flex gap-1">
-                    <button
-                      onClick={() => setCurrentPage(1)}
-                      disabled={currentPage === 1}
-                      className="px-2 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300"
-                    >«</button>
-                    <button
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="px-3 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300"
-                    >Prev</button>
+                    <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
+                      className="px-2 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300">«</button>
+                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                      className="px-3 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300">Prev</button>
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                       const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
                       return (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`px-3 py-1 text-xs rounded ${
-                            currentPage === page
-                              ? "bg-red-600 text-white font-bold"
-                              : "bg-white/5 hover:bg-white/10 text-gray-300"
-                          }`}
-                        >{page}</button>
+                        <button key={page} onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 text-xs rounded ${currentPage === page ? "bg-red-600 text-white font-bold" : "bg-white/5 hover:bg-white/10 text-gray-300"}`}>
+                          {page}
+                        </button>
                       );
                     })}
-                    <button
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-3 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300"
-                    >Next</button>
-                    <button
-                      onClick={() => setCurrentPage(totalPages)}
-                      disabled={currentPage === totalPages}
-                      className="px-2 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300"
-                    >»</button>
+                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                      className="px-3 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300">Next</button>
+                    <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}
+                      className="px-2 py-1 text-xs rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-gray-300">»</button>
                   </div>
                 </div>
               )}
@@ -269,10 +300,7 @@ export default function Home() {
             {/* Alert Signup */}
             <AlertSignup
               visaTypes={VISA_TYPES.slice(1)}
-              countries={allCountries.map((c) => ({
-                code: c,
-                name: data.find((r) => r.country_code === c)?.country_name || c,
-              }))}
+              countries={allCountries}
             />
           </>
         )}
