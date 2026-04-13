@@ -7,11 +7,14 @@ import AlertSignup from "@/components/AlertSignup";
 
 const VISA_TYPES = [
   { key: "all", label: "All Types" },
-  { key: "pr", label: "Permanent Residence" },
-  { key: "work-permit", label: "Work Permit" },
   { key: "visitor-outside-canada", label: "Visitor Visa" },
-  { key: "study-permit", label: "Study Permit" },
-  { key: "citizenship", label: "Citizenship" },
+  { key: "work", label: "Work Permit" },
+  { key: "study", label: "Study Permit" },
+  { key: "supervisa", label: "Super Visa" },
+  { key: "child_dependent", label: "Dependent Child" },
+  { key: "child_adopted", label: "Adopted Child" },
+  { key: "refugees_gov", label: "Gov. Refugee" },
+  { key: "refugees_private", label: "Private Refugee" },
 ];
 
 export default function Home() {

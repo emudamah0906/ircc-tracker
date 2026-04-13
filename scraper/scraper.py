@@ -36,12 +36,10 @@ VISA_LABELS = {
     "supervisa": "Super Visa",
     "study": "Study Permit",
     "work": "Work Permit",
-    "child_dependent": "Dependent Child",
-    "pr": "Permanent Residence",
-    "citizenship": "Citizenship",
-    "sponsorship": "Sponsorship",
-    "refugee": "Refugee",
-    "trv": "Temporary Resident Visa",
+    "child_dependent": "Dependent Child (Sponsorship)",
+    "child_adopted": "Adopted Child",
+    "refugees_gov": "Government-Assisted Refugee",
+    "refugees_private": "Privately Sponsored Refugee",
 }
 
 
@@ -68,10 +66,16 @@ def flatten_processing_times(data: dict, country_map: dict) -> list[dict]:
 
         visa_label = VISA_LABELS.get(visa_key, visa_key.replace("-", " ").title())
 
-        for country_code, timing_str in country_data.items():
+        for country_code, timing_raw in country_data.items():
+            # refugees_private has nested dict: {"sponsor": "X weeks", "refugee": "Y weeks"}
+            if isinstance(timing_raw, dict):
+                timing_str = timing_raw.get("refugee") or timing_raw.get("sponsor", "")
+            else:
+                timing_str = timing_raw
+
             if not isinstance(timing_str, str):
                 continue
-            if "No processing time" in timing_str:
+            if any(x in timing_str for x in ["No processing time", "Not enough data"]):
                 continue
 
             parts = timing_str.strip().split()
