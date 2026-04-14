@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Header from "@/components/Header";
+import PageLayout from "@/components/PageLayout";
 import { supabase } from "@/lib/supabase";
 
 type PermitType = "work" | "study" | "visitor" | "pr_card";
@@ -89,10 +89,8 @@ export default function TrackerPage() {
   }
 
   return (
-    <div className="canada-bg min-h-screen text-white">
-      <Header />
-
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+    <PageLayout activeNav="tracker">
+      <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-bold">⏰ Permit Expiry Tracker</h1>
           <p className="text-gray-400 text-sm mt-1">
@@ -245,7 +243,29 @@ export default function TrackerPage() {
             ))}
           </div>
         )}
-      </main>
-    </div>
+
+        {/* Cross-tool suggestions */}
+        {expiryDate && (
+          <div className="space-y-3">
+            <a href="/" className="canada-next-step" style={{ textDecoration: "none" }}>
+              <span className="text-xl">⏱</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-white">Check current processing times</p>
+                <p className="text-xs text-gray-400">See how long your renewal application will take</p>
+              </div>
+              <span className="text-gray-400 text-xs">→</span>
+            </a>
+            <a href="/pathway" className="canada-next-step" style={{ textDecoration: "none" }}>
+              <span className="text-xl">🗺️</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-white">Planning for PR?</p>
+                <p className="text-xs text-gray-400">Find the best permanent residency pathway for you</p>
+              </div>
+              <span className="text-gray-400 text-xs">→</span>
+            </a>
+          </div>
+        )}
+      </div>
+    </PageLayout>
   );
 }

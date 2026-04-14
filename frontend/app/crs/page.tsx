@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
-import Header from "@/components/Header";
+import PageLayout from "@/components/PageLayout";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -522,13 +522,8 @@ export default function CRSCalculatorPage() {
   }
 
   return (
-    <div className="canada-bg text-white">
-      <Header subtitle="CRS Score Calculator" activeNav="crs" />
-
-      <main
-        className="max-w-6xl mx-auto px-4 py-8 space-y-6"
-        style={{ position: "relative", zIndex: 1 }}
-      >
+    <PageLayout subtitle="CRS Score Calculator" activeNav="crs">
+      <div className="space-y-6" style={{ position: "relative", zIndex: 1 }}>
         {/* Page title */}
         <div>
           <h2 className="text-2xl font-bold text-white">
@@ -1027,15 +1022,25 @@ export default function CRSCalculatorPage() {
             No spam. Unsubscribe any time. Not affiliated with IRCC or the Government of Canada.
           </p>
         </div>
-      </main>
 
-      <footer
-        className="text-center py-6 text-gray-600 text-xs"
-        style={{ position: "relative", zIndex: 1 }}
-      >
-        🍁 ircctracker.org — Not affiliated with IRCC or the Government of Canada.
-        CRS scores are estimates only; always verify with the official IRCC tool.
-      </footer>
-    </div>
+        {/* Cross-tool suggestions */}
+        <a href="/draws" className="canada-next-step" style={{ textDecoration: "none" }}>
+          <span className="text-2xl">🗳</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-white">Check latest Express Entry draws</p>
+            <p className="text-xs text-gray-400">See if your CRS score meets the latest cut-off</p>
+          </div>
+          <span className="text-gray-400 text-sm whitespace-nowrap">View Draws →</span>
+        </a>
+        <a href="/pathway" className="canada-next-step" style={{ textDecoration: "none" }}>
+          <span className="text-2xl">🗺️</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-white">Explore other pathways</p>
+            <p className="text-xs text-gray-400">Express Entry isn't the only way — find all your options</p>
+          </div>
+          <span className="text-gray-400 text-sm whitespace-nowrap">Find Pathways →</span>
+        </a>
+      </div>
+    </PageLayout>
   );
 }

@@ -2,10 +2,15 @@
 
 import { useEffect, useState, useRef } from "react";
 import { supabase, ProcessingTime } from "@/lib/supabase";
-import { getFlagEmoji } from "@/lib/countries";
+import { getFlagEmoji, COUNTRY_NAMES } from "@/lib/countries";
 import TrendChart from "@/components/TrendChart";
 import AlertSignup from "@/components/AlertSignup";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import HeroSection from "@/components/home/HeroSection";
+import JourneyPicker from "@/components/home/JourneyPicker";
+import ToolShowcase from "@/components/home/ToolShowcase";
+import QuickStartPrompt from "@/components/home/QuickStartPrompt";
 
 // location: "outside" = applying from abroad | "inside" = already in Canada | "both" = applies to both
 const VISA_TYPES = [
@@ -38,19 +43,19 @@ const LOCATION_CONFIG = {
 };
 
 const POPULAR_COUNTRIES = [
-  { code: "IND", name: "India" },
-  { code: "PHL", name: "Philippines" },
-  { code: "CHN", name: "China" },
-  { code: "NGA", name: "Nigeria" },
-  { code: "MEX", name: "Mexico" },
-  { code: "PAK", name: "Pakistan" },
-  { code: "GBR", name: "UK" },
-  { code: "USA", name: "USA" },
+  { code: "IN", name: "India" },
+  { code: "PH", name: "Philippines" },
+  { code: "CN", name: "China" },
+  { code: "NG", name: "Nigeria" },
+  { code: "MX", name: "Mexico" },
+  { code: "PK", name: "Pakistan" },
+  { code: "GB", name: "UK" },
+  { code: "US", name: "USA" },
 ];
 
 export default function Home() {
   const [data, setData] = useState<ProcessingTime[]>([]);
-  const [selectedCountry, setSelectedCountry] = useState("IND");
+  const [selectedCountry, setSelectedCountry] = useState("IN");
   const [countrySearch, setCountrySearch] = useState("");
   const [selectedVisa, setSelectedVisa] = useState("all");
   const [sortBy, setSortBy] = useState<"alpha" | "fastest" | "slowest">("alpha");
@@ -63,6 +68,7 @@ export default function Home() {
   const [latestDrawDate, setLatestDrawDate] = useState<string | null>(null);
   const [location, setLocation] = useState<"outside" | "inside">("outside");
 
+  const processingRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 20;
 
   useEffect(() => {
@@ -82,7 +88,10 @@ export default function Home() {
     fetchData();
   }, []);
 
-  const allCountries = [...new Map(data.map(r => [r.country_code, { code: r.country_code, name: r.country_name }])).values()]
+  const allCountries = [...new Map(data.map(r => [r.country_code, {
+    code: r.country_code,
+    name: COUNTRY_NAMES[r.country_code] || r.country_name || r.country_code,
+  }])).values()]
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const filteredCountries = countrySearch.trim()
@@ -102,23 +111,21 @@ export default function Home() {
     .filter(r => locationVisas.includes(r.visa_type))
     .filter(r => selectedVisa === "all" || r.visa_type === selectedVisa);
 
-  // Build grouped table: group by country, filter by visa + search, sort
+  // Build grouped table
   type CountryGroup = { code: string; name: string; rows: ProcessingTime[] };
 
   let filteredRows = data.filter(r => locationVisas.includes(r.visa_type));
   if (selectedVisa !== "all") filteredRows = filteredRows.filter(r => r.visa_type === selectedVisa);
 
-  // Group by country
   const groupMap = new Map<string, CountryGroup>();
   for (const row of filteredRows) {
     if (!groupMap.has(row.country_code)) {
-      groupMap.set(row.country_code, { code: row.country_code, name: row.country_name, rows: [] });
+      groupMap.set(row.country_code, { code: row.country_code, name: COUNTRY_NAMES[row.country_code] || row.country_name || row.country_code, rows: [] });
     }
     groupMap.get(row.country_code)!.rows.push(row);
   }
   let countryGroups = Array.from(groupMap.values());
 
-  // Search filter on country name
   if (tableSearch.trim()) {
     const q = tableSearch.toLowerCase();
     countryGroups = countryGroups.filter(g =>
@@ -126,7 +133,6 @@ export default function Home() {
     );
   }
 
-  // Sort country groups
   if (sortBy === "alpha") {
     countryGroups.sort((a, b) => a.name.localeCompare(b.name));
   } else if (sortBy === "fastest") {
@@ -147,6 +153,21 @@ export default function Home() {
     setShowCountryDropdown(false);
   }
 
+  function scrollToProcessing() {
+    processingRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  function handleJourneySelect(loc: "outside" | "inside") {
+    setLocation(loc);
+    setSelectedVisa("all");
+    setCurrentPage(1);
+    if (loc === "inside") {
+      window.location.href = "/tracker";
+    } else {
+      window.location.href = "/pathway";
+    }
+  }
+
   // Close dropdown on outside click
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -162,14 +183,26 @@ export default function Home() {
 
   return (
     <div className="canada-bg text-white">
-      <Header activeNav="processing" lastUpdated={lastUpdated} />
+      <Header activeNav="home" lastUpdated={lastUpdated} />
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-4 py-8 space-y-10">
 
         {loading ? (
           <div className="text-center py-32 text-gray-500">Loading processing times...</div>
         ) : (
           <>
+            {/* ── HERO SECTION ── */}
+            <HeroSection onScrollToProcessing={scrollToProcessing} />
+
+            {/* ── QUICK START PROMPT (first-time visitors) ── */}
+            <QuickStartPrompt />
+
+            {/* ── JOURNEY PICKER ── */}
+            <JourneyPicker onSelectLocation={handleJourneySelect} />
+
+            {/* ── TOOL SHOWCASE ── */}
+            <ToolShowcase />
+
             {/* ── STATS BAR ── */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
@@ -212,100 +245,103 @@ export default function Home() {
               </a>
             )}
 
-            {/* ── HERO: Country Selector ── */}
-            <section className="canada-card p-8 text-center">
+            {/* ── PROCESSING TIMES SECTION ── */}
+            <div ref={processingRef}>
+              <section className="canada-card p-8 text-center">
+                <h2 className="section-title text-xl mb-2">Processing Times</h2>
 
-              {/* Location toggle */}
-              <div className="flex justify-center mb-6">
-                <div className="flex rounded-xl overflow-hidden border border-white/10" style={{ background: "rgba(255,255,255,0.04)" }}>
-                  {(["outside", "inside"] as const).map((loc) => (
+                {/* Location toggle */}
+                <div className="flex justify-center mb-6">
+                  <div className="flex rounded-xl overflow-hidden border border-white/10" style={{ background: "rgba(255,255,255,0.04)" }}>
+                    {(["outside", "inside"] as const).map((loc) => (
+                      <button
+                        key={loc}
+                        onClick={() => { setLocation(loc); setSelectedVisa("all"); setCurrentPage(1); }}
+                        style={{
+                          padding: "10px 20px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          border: "none",
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          background: location === loc ? "linear-gradient(135deg, #d52b1e, #a01208)" : "transparent",
+                          color: location === loc ? "white" : "#9ca3af",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                      >
+                        <span>{LOCATION_CONFIG[loc].icon}</span>
+                        <span className="hidden sm:inline">{loc === "outside" ? "Outside Canada" : "Inside Canada"}</span>
+                        <span className="sm:hidden">{loc === "outside" ? "Abroad" : "In Canada"}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <h3 className="text-xl font-bold mb-1">{LOCATION_CONFIG[location].label}</h3>
+                <p className="text-gray-400 mb-2 text-sm">{LOCATION_CONFIG[location].sublabel}</p>
+                <p className="text-xs text-gray-500 mb-6 max-w-lg mx-auto">{LOCATION_CONFIG[location].tip}</p>
+
+                {/* Popular country quick-picks */}
+                <div className="flex flex-wrap justify-center gap-2 mb-5">
+                  {POPULAR_COUNTRIES.map((c) => (
                     <button
-                      key={loc}
-                      onClick={() => { setLocation(loc); setSelectedVisa("all"); setCurrentPage(1); }}
-                      style={{
-                        padding: "10px 20px",
-                        fontSize: "13px",
-                        fontWeight: 600,
-                        border: "none",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        background: location === loc ? "linear-gradient(135deg, #d52b1e, #a01208)" : "transparent",
-                        color: location === loc ? "white" : "#9ca3af",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                      }}
+                      key={c.code}
+                      onClick={() => selectCountry(c.code)}
+                      className={`canada-pill ${selectedCountry === c.code ? "active" : ""}`}
+                      style={{ fontSize: "12px", padding: "5px 14px" }}
                     >
-                      <span>{LOCATION_CONFIG[loc].icon}</span>
-                      <span className="hidden sm:inline">{loc === "outside" ? "Outside Canada" : "Inside Canada"}</span>
-                      <span className="sm:hidden">{loc === "outside" ? "Abroad" : "In Canada"}</span>
+                      {getFlagEmoji(c.code)} {c.name}
                     </button>
                   ))}
                 </div>
-              </div>
 
-              <h2 className="text-2xl font-bold mb-1">{LOCATION_CONFIG[location].label}</h2>
-              <p className="text-gray-400 mb-2 text-sm">{LOCATION_CONFIG[location].sublabel}</p>
-              <p className="text-xs text-gray-500 mb-6 max-w-lg mx-auto">{LOCATION_CONFIG[location].tip}</p>
-
-              {/* Popular country quick-picks */}
-              <div className="flex flex-wrap justify-center gap-2 mb-5">
-                {POPULAR_COUNTRIES.map((c) => (
-                  <button
-                    key={c.code}
-                    onClick={() => selectCountry(c.code)}
-                    className={`canada-pill ${selectedCountry === c.code ? "active" : ""}`}
-                    style={{ fontSize: "12px", padding: "5px 14px" }}
+                {/* Country search dropdown */}
+                <div id="country-dropdown-root" className="relative max-w-md mx-auto" style={{ zIndex: 200 }}>
+                  <div
+                    className="canada-input flex items-center gap-3 cursor-pointer py-3 px-4"
+                    onClick={() => setShowCountryDropdown(!showCountryDropdown)}
                   >
-                    {getFlagEmoji(c.code)} {c.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* Country search dropdown */}
-              <div id="country-dropdown-root" className="relative max-w-md mx-auto" style={{ zIndex: 200 }}>
-                <div
-                  className="canada-input flex items-center gap-3 cursor-pointer py-3 px-4"
-                  onClick={() => setShowCountryDropdown(!showCountryDropdown)}
-                >
-                  <span className="text-2xl">{getFlagEmoji(selectedCountry)}</span>
-                  <span className="flex-1 text-left font-medium">{selectedCountryName}</span>
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-
-                {showCountryDropdown && (
-                  <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-white/10 overflow-hidden"
-                    style={{ background: "#0d1b35", maxHeight: "300px", overflowY: "auto", zIndex: 300 }}>
-                    <div className="p-2 sticky top-0" style={{ background: "#0d1b35" }}>
-                      <input
-                        type="text"
-                        placeholder="Search country..."
-                        value={countrySearch}
-                        onChange={(e) => setCountrySearch(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        autoFocus
-                        className="canada-input py-2 text-sm"
-                      />
-                    </div>
-                    {filteredCountries.map((c) => (
-                      <div
-                        key={c.code}
-                        onClick={() => selectCountry(c.code)}
-                        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-white/5 text-sm ${selectedCountry === c.code ? "bg-red-900/30 text-white" : "text-gray-300"}`}
-                      >
-                        <span className="text-lg">{getFlagEmoji(c.code)}</span>
-                        <span>{c.name}</span>
-                      </div>
-                    ))}
-                    {filteredCountries.length === 0 && (
-                      <p className="text-center text-gray-500 py-4 text-sm">No countries found</p>
-                    )}
+                    <span className="text-2xl">{getFlagEmoji(selectedCountry)}</span>
+                    <span className="flex-1 text-left font-medium">{selectedCountryName}</span>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </div>
-                )}
-              </div>
-            </section>
+
+                  {showCountryDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-white/10 overflow-hidden"
+                      style={{ background: "#0d1b35", maxHeight: "300px", overflowY: "auto", zIndex: 300 }}>
+                      <div className="p-2 sticky top-0" style={{ background: "#0d1b35" }}>
+                        <input
+                          type="text"
+                          placeholder="Search country..."
+                          value={countrySearch}
+                          onChange={(e) => setCountrySearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          autoFocus
+                          className="canada-input py-2 text-sm"
+                        />
+                      </div>
+                      {filteredCountries.map((c) => (
+                        <div
+                          key={c.code}
+                          onClick={() => selectCountry(c.code)}
+                          className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-white/5 text-sm ${selectedCountry === c.code ? "bg-red-900/30 text-white" : "text-gray-300"}`}
+                        >
+                          <span className="text-lg">{getFlagEmoji(c.code)}</span>
+                          <span>{c.name}</span>
+                        </div>
+                      ))}
+                      {filteredCountries.length === 0 && (
+                        <p className="text-center text-gray-500 py-4 text-sm">No countries found</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
 
             {/* ── INSIDE CANADA: extra info banner ── */}
             {location === "inside" && (
@@ -336,8 +372,7 @@ export default function Home() {
                   <h2 className="section-title mb-0">
                     {getFlagEmoji(selectedCountry)} {selectedCountryName} — Processing Times
                   </h2>
-                  {/* Visa type filters — scoped to location */}
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 overflow-x-auto">
                     {visibleVisaTypes.map((v) => (
                       <button
                         key={v.key}
@@ -375,7 +410,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* ── TREND CHART ── only show if country has cards */}
+            {/* ── TREND CHART ── */}
             {countryCards.length > 0 && (
               <section className="canada-card p-6">
                 <h2 className="section-title mb-1">
@@ -388,7 +423,6 @@ export default function Home() {
 
             {/* ── ALL COUNTRIES TABLE ── */}
             <section>
-              {/* Header row */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
                 <h2 className="section-title mb-0">
                   🌍 All Countries
@@ -416,7 +450,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Search bar */}
               <div className="relative mb-3">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
                 <input
@@ -430,7 +463,7 @@ export default function Home() {
                   <button
                     onClick={() => { setTableSearch(""); setCurrentPage(1); }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white text-lg leading-none"
-                  >×</button>
+                  >x</button>
                 )}
               </div>
 
@@ -461,7 +494,6 @@ export default function Home() {
                           } ${ri === 0 ? "border-t border-white/10" : "border-t border-white/5"}`}
                           onClick={() => { setSelectedCountry(group.code); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                         >
-                          {/* # and Country only on first row of group */}
                           {ri === 0 ? (
                             <>
                               <td className="px-4 py-3 text-gray-500 text-xs align-top pt-4" rowSpan={group.rows.length}>
@@ -490,7 +522,6 @@ export default function Home() {
                 </table>
               </div>
 
-              {/* Pagination — country-based */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4">
                   <p className="text-xs text-gray-500">
@@ -519,7 +550,7 @@ export default function Home() {
               )}
             </section>
 
-            {/* ── ALERT SIGNUP — bottom ── */}
+            {/* ── ALERT SIGNUP ── */}
             <AlertSignup
               visaTypes={VISA_TYPES.slice(1)}
               countries={allCountries}
@@ -528,9 +559,7 @@ export default function Home() {
         )}
       </main>
 
-      <footer className="text-center py-6 text-gray-600 text-xs" style={{ position: "relative", zIndex: 1 }}>
-        🍁 ircctracker.org — Not affiliated with IRCC or the Government of Canada
-      </footer>
+      <Footer />
     </div>
   );
 }
