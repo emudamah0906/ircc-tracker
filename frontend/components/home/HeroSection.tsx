@@ -15,7 +15,7 @@ export default function HeroSection({
       </p>
 
       {/* Trust signals */}
-      <div className="flex flex-wrap justify-center gap-4 text-xs text-gray-400 mb-8">
+      <div className="flex flex-wrap justify-center gap-4 text-xs text-gray-400 mb-6">
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
           Updated daily from IRCC
@@ -26,8 +26,27 @@ export default function HeroSection({
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
-          6 free tools
+          10 free tools
         </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+          Used by 5,000+ applicants
+        </span>
+      </div>
+
+      {/* Stats bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8 max-w-2xl mx-auto">
+        {[
+          { value: "180+", label: "Countries", color: "#60a5fa" },
+          { value: "10", label: "Free Tools", color: "#4ade80" },
+          { value: "Daily", label: "Data Updates", color: "#facc15" },
+          { value: "Free", label: "No Credit Card", color: "#f472b6" },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <p className="text-lg font-bold" style={{ color: s.color }}>{s.value}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+          </div>
+        ))}
       </div>
 
       {/* CTAs */}

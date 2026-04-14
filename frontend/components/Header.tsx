@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
-type ActiveNav = "home" | "draws" | "crs" | "pathway" | "tracker" | "funds" | "dashboard" | "pricing" | "processing";
+type ActiveNav = "home" | "draws" | "crs" | "pathway" | "tracker" | "funds" | "dashboard" | "pricing" | "processing" | "clb" | "noc" | "checklist" | "pnp";
 
 const NAV_ITEMS = [
   { href: "/", key: "home" as ActiveNav, label: "Processing Times", icon: "⏱" },
@@ -14,8 +14,12 @@ const NAV_ITEMS = [
 
 const MORE_TOOLS = [
   { href: "/pathway", key: "pathway" as ActiveNav, icon: "🗺️", label: "PR Pathway Finder", sub: "Which stream fits you?" },
+  { href: "/pnp", key: "pnp" as ActiveNav, icon: "🏛️", label: "PNP Tracker", sub: "Ontario, BC & Alberta streams" },
   { href: "/tracker", key: "tracker" as ActiveNav, icon: "⏰", label: "Permit Expiry Tracker", sub: "Never miss your renewal" },
   { href: "/funds", key: "funds" as ActiveNav, icon: "💰", label: "Proof of Funds", sub: "How much money you need" },
+  { href: "/clb", key: "clb" as ActiveNav, icon: "🔤", label: "CLB Converter", sub: "IELTS / CELPIP → CLB" },
+  { href: "/noc", key: "noc" as ActiveNav, icon: "🔍", label: "NOC Code Finder", sub: "Find your NOC 2021 code" },
+  { href: "/checklist", key: "checklist" as ActiveNav, icon: "📋", label: "Document Checklist", sub: "Know what documents you need" },
   { href: "/dashboard", key: "dashboard" as ActiveNav, icon: "📊", label: "My Dashboard", sub: "Your PR eligibility" },
 ];
 
@@ -251,7 +255,9 @@ export default function Header({
               <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 px-2">Calculate</p>
               {[
                 { href: "/crs", key: "crs" as ActiveNav, icon: "🧮", label: "CRS Calculator", sub: "Calculate your score" },
+                { href: "/clb", key: "clb" as ActiveNav, icon: "🔤", label: "CLB Converter", sub: "IELTS / CELPIP → CLB" },
                 { href: "/funds", key: "funds" as ActiveNav, icon: "💰", label: "Proof of Funds", sub: "How much money you need" },
+                { href: "/noc", key: "noc" as ActiveNav, icon: "🔍", label: "NOC Code Finder", sub: "Find your NOC 2021 code" },
               ].map(item => (
                 <a key={item.href} href={item.href}
                   onClick={() => setMobileMenu(false)}
@@ -271,6 +277,8 @@ export default function Header({
               <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 px-2">Plan</p>
               {[
                 { href: "/pathway", key: "pathway" as ActiveNav, icon: "🗺️", label: "PR Pathway Finder", sub: "Which stream fits you?" },
+                { href: "/pnp", key: "pnp" as ActiveNav, icon: "🏛️", label: "PNP Tracker", sub: "Ontario, BC & Alberta streams" },
+                { href: "/checklist", key: "checklist" as ActiveNav, icon: "📋", label: "Document Checklist", sub: "Know what documents you need" },
                 { href: "/dashboard", key: "dashboard" as ActiveNav, icon: "📊", label: "My Dashboard", sub: "Your PR eligibility" },
               ].map(item => (
                 <a key={item.href} href={item.href}
