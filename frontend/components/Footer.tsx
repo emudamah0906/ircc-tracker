@@ -4,7 +4,11 @@ const TOOL_LINKS = [
   { href: "/", label: "Processing Times" },
   { href: "/draws", label: "PR Draws" },
   { href: "/crs", label: "CRS Calculator" },
+  { href: "/clb", label: "CLB Converter" },
   { href: "/pathway", label: "Pathway Finder" },
+  { href: "/pnp", label: "PNP Tracker" },
+  { href: "/noc", label: "NOC Finder" },
+  { href: "/checklist", label: "Document Checklist" },
   { href: "/tracker", label: "Permit Tracker" },
   { href: "/funds", label: "Proof of Funds" },
 ];
