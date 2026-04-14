@@ -18,7 +18,7 @@ export default function AlertSignup({
   const [dialCode, setDialCode] = useState("+91");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [visaType, setVisaType] = useState(visaTypes[0]?.key || "");
-  const [countryCode, setCountryCode] = useState("IND");
+  const [countryCode, setCountryCode] = useState("IN");
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
