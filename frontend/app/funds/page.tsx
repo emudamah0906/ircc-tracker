@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Header from "@/components/Header";
+import PageLayout from "@/components/PageLayout";
 
 // Official IRCC proof of funds (FSW) — 2024
 const FSW_FUNDS: Record<number, number> = {
@@ -68,10 +68,8 @@ export default function FundsPage() {
   ];
 
   return (
-    <div className="canada-bg min-h-screen text-white">
-      <Header />
-
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+    <PageLayout activeNav="funds">
+      <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-bold">💰 Proof of Funds Calculator</h1>
           <p className="text-gray-400 text-sm mt-1">
@@ -275,7 +273,7 @@ export default function FundsPage() {
             <span>⏱ Check processing times</span><span>→</span>
           </a>
         </div>
-      </main>
-    </div>
+      </div>
+    </PageLayout>
   );
 }

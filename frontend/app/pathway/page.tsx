@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Header from "@/components/Header";
+import PageLayout from "@/components/PageLayout";
 
 type Answers = {
   location: "inside" | "outside" | "";
@@ -215,10 +215,8 @@ export default function PathwayPage() {
   };
 
   return (
-    <div className="canada-bg min-h-screen text-white">
-      <Header />
-
-      <main className="max-w-2xl mx-auto px-4 py-8">
+    <PageLayout activeNav="pathway">
+      <div className="max-w-2xl mx-auto">
         {!showResults ? (
           <>
             <div className="text-center mb-8">
@@ -413,8 +411,8 @@ export default function PathwayPage() {
                 </button>
               </div>
             </div>
-          </>
-        ) : (
+          </> /* end questionnaire */
+        ) : ( /* results */
           <>
             <div className="text-center mb-8">
               <h1 className="text-2xl font-bold">Your Immigration Pathways</h1>
@@ -488,13 +486,41 @@ export default function PathwayPage() {
                 className="canada-pill flex-1 text-center">
                 ← Start Over
               </button>
-              <a href="/dashboard" className="canada-btn flex-1 text-center" style={{ textDecoration: "none" }}>
+              <a href="/crs" className="canada-btn flex-1 text-center" style={{ textDecoration: "none" }}>
                 Calculate My CRS Score →
+              </a>
+            </div>
+
+            {/* Cross-tool suggestions */}
+            <div className="space-y-3 mt-6">
+              <a href="/crs" className="canada-next-step" style={{ textDecoration: "none" }}>
+                <span className="text-xl">🧮</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-white">Calculate your CRS score</p>
+                  <p className="text-xs text-gray-400">See exactly how many points you have for Express Entry</p>
+                </div>
+                <span className="text-gray-400 text-xs">→</span>
+              </a>
+              <a href="/" className="canada-next-step" style={{ textDecoration: "none" }}>
+                <span className="text-xl">⏱</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-white">Check processing times</p>
+                  <p className="text-xs text-gray-400">See how long your visa type takes to process</p>
+                </div>
+                <span className="text-gray-400 text-xs">→</span>
+              </a>
+              <a href="/funds" className="canada-next-step" style={{ textDecoration: "none" }}>
+                <span className="text-xl">💰</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-white">Calculate proof of funds</p>
+                  <p className="text-xs text-gray-400">Find out how much money you need to show IRCC</p>
+                </div>
+                <span className="text-gray-400 text-xs">→</span>
               </a>
             </div>
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </PageLayout>
   );
 }

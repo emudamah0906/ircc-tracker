@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import Header from "@/components/Header";
+import PageLayout from "@/components/PageLayout";
 import type { User } from "@supabase/supabase-js";
 
 type LangTest = "ielts" | "celpip";
@@ -256,19 +256,19 @@ export default function Dashboard() {
 
   if (loadingProfile) {
     return (
-      <div className="canada-bg min-h-screen text-white flex items-center justify-center">
-        <p className="text-gray-400">Loading your profile...</p>
-      </div>
+      <PageLayout activeNav="dashboard">
+        <div className="flex items-center justify-center py-20">
+          <p className="text-gray-400">Loading your profile...</p>
+        </div>
+      </PageLayout>
     );
   }
 
   const scoreColor = isEligible ? "#22c55e" : gap <= 50 ? "#eab308" : "#d52b1e";
 
   return (
-    <div className="canada-bg min-h-screen text-white">
-      <Header activeNav="processing" />
-
-      <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <PageLayout activeNav="dashboard">
+      <div className="max-w-5xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-bold">My PR Dashboard</h1>
           <p className="text-gray-400 text-sm mt-1">Fill in your details — we calculate your CRS score and PR eligibility live.</p>
@@ -528,7 +528,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </PageLayout>
   );
 }

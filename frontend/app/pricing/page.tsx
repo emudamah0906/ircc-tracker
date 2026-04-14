@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import PageLayout from "@/components/PageLayout";
 
 export default function PricingPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const router = useRouter();
 
   async function handleUpgrade(e: React.FormEvent) {
     e.preventDefault();
@@ -37,13 +36,8 @@ export default function PricingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4">
-        <a href="/" className="text-xl font-bold">🍁 IRCC Processing Times</a>
-      </header>
-
-      <main className="flex-1 max-w-4xl mx-auto px-4 py-16 w-full">
+    <PageLayout activeNav="pricing">
+      <div className="max-w-4xl mx-auto py-8">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-3">Simple Pricing</h1>
           <p className="text-gray-400 text-lg">Get instant alerts when processing times change</p>
@@ -139,7 +133,7 @@ export default function PricingPage() {
         <p className="text-center text-gray-500 text-sm mt-8">
           Payments secured by Stripe. Cancel anytime from your email.
         </p>
-      </main>
-    </div>
+      </div>
+    </PageLayout>
   );
 }

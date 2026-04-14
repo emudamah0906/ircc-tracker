@@ -64,7 +64,7 @@ body {
   backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 1000;
 }
 
 /* Stat cards */
@@ -214,6 +214,99 @@ body {
     text-align: left !important;
     padding-bottom: 6px;
   }
+}
+
+/* Navigation links */
+.canada-nav-link {
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.canada-nav-link:hover {
+  color: #f0f4ff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.canada-nav-link.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, rgba(213, 43, 30, 0.2), rgba(160, 18, 8, 0.15));
+  border: 1px solid rgba(213, 43, 30, 0.3);
+}
+
+/* Hero section */
+.canada-hero {
+  background: linear-gradient(180deg, rgba(213, 43, 30, 0.08) 0%, transparent 60%);
+  padding: 48px 24px;
+  text-align: center;
+  position: relative;
+}
+
+/* Feature cards for tool showcase */
+.canada-feature-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 24px;
+  transition: all 0.25s;
+  text-decoration: none;
+  display: block;
+}
+
+.canada-feature-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(213, 43, 30, 0.4);
+  transform: translateY(-3px);
+}
+
+/* CTA / Journey picker cards */
+.canada-cta-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 32px 24px;
+  transition: all 0.25s;
+  text-align: center;
+  cursor: pointer;
+}
+
+.canada-cta-card:hover {
+  background: rgba(213, 43, 30, 0.06);
+  border-color: rgba(213, 43, 30, 0.35);
+  transform: translateY(-2px);
+}
+
+/* Cross-tool next-step banner */
+.canada-next-step {
+  background: linear-gradient(135deg, rgba(213, 43, 30, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
+  border: 1px solid rgba(213, 43, 30, 0.2);
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.canada-next-step:hover {
+  border-color: rgba(213, 43, 30, 0.4);
+}
+
+/* Table improvements */
+.canada-table tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.canada-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 2px solid rgba(213, 43, 30, 0.4);
 }
 
 /* Scrollbar */
