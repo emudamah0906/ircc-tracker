@@ -1,3 +1,31 @@
+// Full country names by ISO 2-letter code (fallback when DB returns just the code)
+export const COUNTRY_NAMES: Record<string, string> = {
+  AF: "Afghanistan", AL: "Albania", DZ: "Algeria", AR: "Argentina",
+  AU: "Australia", AT: "Austria", AZ: "Azerbaijan", BD: "Bangladesh",
+  BE: "Belgium", BR: "Brazil", BG: "Bulgaria", KH: "Cambodia",
+  CM: "Cameroon", CA: "Canada", CL: "Chile", CN: "China",
+  CO: "Colombia", CD: "Congo (DRC)", HR: "Croatia", CY: "Cyprus",
+  CZ: "Czech Republic", DK: "Denmark", EG: "Egypt", ET: "Ethiopia",
+  FI: "Finland", FR: "France", GE: "Georgia", DE: "Germany",
+  GH: "Ghana", GR: "Greece", HU: "Hungary", IN: "India",
+  ID: "Indonesia", IR: "Iran", IQ: "Iraq", IE: "Ireland",
+  IL: "Israel", IT: "Italy", JM: "Jamaica", JP: "Japan",
+  JO: "Jordan", KZ: "Kazakhstan", KE: "Kenya", KR: "South Korea",
+  KW: "Kuwait", LB: "Lebanon", LY: "Libya", MY: "Malaysia",
+  MX: "Mexico", MA: "Morocco", NP: "Nepal", NL: "Netherlands",
+  NZ: "New Zealand", NG: "Nigeria", MK: "North Macedonia", NO: "Norway",
+  PK: "Pakistan", PE: "Peru", PH: "Philippines", PL: "Poland",
+  PT: "Portugal", QA: "Qatar", RO: "Romania", RU: "Russia",
+  SA: "Saudi Arabia", SN: "Senegal", RS: "Serbia", SL: "Sierra Leone",
+  ZA: "South Africa", ES: "Spain", LK: "Sri Lanka", SD: "Sudan",
+  SE: "Sweden", CH: "Switzerland", SY: "Syria", TW: "Taiwan",
+  TZ: "Tanzania", TH: "Thailand", TT: "Trinidad and Tobago",
+  TN: "Tunisia", TR: "Turkey", UG: "Uganda", UA: "Ukraine",
+  AE: "United Arab Emirates", GB: "United Kingdom", US: "United States",
+  UZ: "Uzbekistan", VE: "Venezuela", VN: "Vietnam", YE: "Yemen",
+  ZM: "Zambia", ZW: "Zimbabwe",
+};
+
 // Convert ISO country code to flag emoji
 export function getFlagEmoji(countryCode: string): string {
   if (!countryCode || countryCode.length !== 2) return "🌐";
