@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase, ProcessingTime } from "@/lib/supabase";
 import { getFlagEmoji, COUNTRY_NAMES } from "@/lib/countries";
 import TrendChart from "@/components/TrendChart";
@@ -11,6 +11,16 @@ import HeroSection from "@/components/home/HeroSection";
 import JourneyPicker from "@/components/home/JourneyPicker";
 import ToolShowcase from "@/components/home/ToolShowcase";
 import QuickStartPrompt from "@/components/home/QuickStartPrompt";
+
+// Type for IRCC news items
+type NewsItem = {
+  id: number;
+  title: string;
+  url: string;
+  summary: string | null;
+  published_at: string;
+  source: string;
+};
 
 // location: "outside" = applying from abroad | "inside" = already in Canada | "both" = applies to both
 const VISA_TYPES = [
@@ -53,6 +63,18 @@ const POPULAR_COUNTRIES = [
   { code: "US", name: "USA" },
 ];
 
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+}
+
 export default function Home() {
   const [data, setData] = useState<ProcessingTime[]>([]);
   const [selectedCountry, setSelectedCountry] = useState("IN");
@@ -63,30 +85,64 @@ export default function Home() {
   const [tableSearch, setTableSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [latestCRS, setLatestCRS] = useState<number | null>(null);
   const [latestDrawDate, setLatestDrawDate] = useState<string | null>(null);
   const [location, setLocation] = useState<"outside" | "inside">("outside");
+  const [news, setNews] = useState<NewsItem[]>([]);
 
   const processingRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 20;
 
-  useEffect(() => {
-    async function fetchData() {
-      const [{ data: rows }, { data: draws }] = await Promise.all([
-        supabase.from("latest_processing_times").select("*"),
-        supabase.from("pr_draws").select("crs_score, draw_date").is("province", null).order("draw_date", { ascending: false }).limit(1),
-      ]);
-      setData(rows || []);
-      if (rows?.length) setLastUpdated(rows[0].fetched_at);
-      if (draws?.length) {
-        setLatestCRS(draws[0].crs_score);
-        setLatestDrawDate(draws[0].draw_date);
-      }
-      setLoading(false);
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    const [{ data: rows }, { data: draws }, { data: newsRows }] = await Promise.all([
+      supabase.from("latest_processing_times").select("*"),
+      supabase.from("pr_draws").select("crs_score, draw_date").is("province", null).order("draw_date", { ascending: false }).limit(1),
+      supabase.from("ircc_news").select("*").order("published_at", { ascending: false }).limit(5),
+    ]);
+    setData(rows || []);
+    if (rows?.length) setLastUpdated(rows[0].fetched_at);
+    if (draws?.length) {
+      setLatestCRS(draws[0].crs_score);
+      setLatestDrawDate(draws[0].draw_date);
     }
-    fetchData();
+    setNews(newsRows || []);
+    setLastRefresh(new Date());
+    if (!silent) setLoading(false);
   }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Realtime + polling + visibility refresh
+  useEffect(() => {
+    // Realtime channels — requires Realtime enabled on these tables in Supabase dashboard
+    const channel = supabase
+      .channel("home_realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "processing_times" }, () => fetchData(true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "pr_draws" }, () => fetchData(true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "ircc_news" }, () => fetchData(true))
+      .subscribe();
+
+    // Polling fallback every 60s (works even without Realtime enabled)
+    const poll = setInterval(() => fetchData(true), 60_000);
+
+    // Refetch when tab regains focus
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchData(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [fetchData]);
 
   const allCountries = [...new Map(data.map(r => [r.country_code, {
     code: r.country_code,
@@ -243,6 +299,54 @@ export default function Home() {
                   <span className="text-gray-400 text-sm whitespace-nowrap">View all draws →</span>
                 </div>
               </a>
+            )}
+
+            {/* ── IRCC NEWS SECTION (compact preview) ── */}
+            {news.length > 0 && (
+              <section className="canada-card p-5">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📰</span>
+                    <h2 className="text-base font-semibold">Latest IRCC News</h2>
+                    {lastRefresh && (
+                      <span className="text-xs text-gray-500 flex items-center gap-1.5 ml-2">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                        Live
+                      </span>
+                    )}
+                  </div>
+                  <a href="/news" className="text-xs text-gray-400 hover:text-white whitespace-nowrap">
+                    View all news →
+                  </a>
+                </div>
+                <div className="space-y-2">
+                  {news.slice(0, 5).map((item) => (
+                    <a
+                      key={item.id}
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-lg px-3 py-2.5 hover:bg-white/5 transition-colors border border-transparent hover:border-white/10"
+                      style={{ textDecoration: "none" }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm text-gray-100 font-medium leading-snug flex-1">
+                          {item.title}
+                        </p>
+                        <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0 mt-0.5">
+                          {timeAgo(item.published_at)}
+                        </span>
+                      </div>
+                      {item.summary && (
+                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.summary}</p>
+                      )}
+                    </a>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-600 mt-3 text-right">
+                  Source: canada.ca — IRCC newsroom
+                </p>
+              </section>
             )}
 
             {/* ── PROCESSING TIMES SECTION ── */}
