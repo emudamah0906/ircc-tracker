@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import PageLayout from "@/components/PageLayout";
 
@@ -226,8 +226,6 @@ function getLangScoreForCLB(clb: number, table: Record<number, number>): number 
 }
 
 // ─── Main CRS Calculator ──────────────────────────────────────────────────────
-
-const LATEST_CUTOFF = 477;
 
 function calcCRS(form: FormState): {
   total: number;
@@ -492,11 +490,47 @@ export default function CRSCalculatorPage() {
   const [alertEmail, setAlertEmail] = useState("");
   const [alertSubmitted, setAlertSubmitted] = useState(false);
   const [alertLoading, setAlertLoading] = useState(false);
+  const [recentDraws, setRecentDraws] = useState<{ score: number; date: string; program: string }[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("crs_form_v2");
+      if (saved) setForm(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("crs_form_v2", JSON.stringify(form));
+    } catch {}
+  }, [form]);
+
+  useEffect(() => {
+    supabase
+      .from("pr_draws")
+      .select("crs_score, draw_date, program")
+      .is("province", null)
+      .not("crs_score", "is", null)
+      .order("draw_date", { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (data) {
+          setRecentDraws(
+            data.map((d) => ({
+              score: d.crs_score as number,
+              date: d.draw_date as string,
+              program: d.program as string,
+            }))
+          );
+        }
+      });
+  }, []);
 
   const result = useMemo(() => calcCRS(form), [form]);
   const { total, breakdown } = result;
 
-  const pointsNeeded = Math.max(0, LATEST_CUTOFF - total);
+  const latestCutoff = recentDraws[0]?.score ?? 477;
+  const pointsNeeded = Math.max(0, latestCutoff - total);
   const scoreColor =
     total >= 470
       ? { ring: "ring-green-500", text: "text-green-400", badge: "bg-green-900/40 text-green-300 border-green-700" }
@@ -879,31 +913,80 @@ export default function CRSCalculatorPage() {
                 </p>
                 <p className="text-sm text-gray-300">
                   Latest Federal draw cutoff:{" "}
-                  <span className="font-bold text-white">{LATEST_CUTOFF}</span>
+                  <span className="font-bold text-white">
+                    {recentDraws.length > 0 ? latestCutoff : "Loading…"}
+                  </span>
                 </p>
-                {pointsNeeded === 0 ? (
-                  <p className="text-sm text-green-400 font-semibold mt-1">
-                    You meet or exceed the latest cutoff!
-                  </p>
-                ) : (
-                  <p className="text-sm text-yellow-400 mt-1">
-                    You need{" "}
-                    <span className="font-bold text-white">{pointsNeeded}</span>{" "}
-                    more points to match the latest cutoff.
-                  </p>
+                {recentDraws.length > 0 && (
+                  <>
+                    {pointsNeeded === 0 ? (
+                      <p className="text-sm text-green-400 font-semibold mt-1">
+                        You meet or exceed the latest cutoff!
+                      </p>
+                    ) : (
+                      <p className="text-sm text-yellow-400 mt-1">
+                        You need{" "}
+                        <span className="font-bold text-white">{pointsNeeded}</span>{" "}
+                        more points to match the latest cutoff.
+                      </p>
+                    )}
+                    <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${
+                          total >= latestCutoff ? "bg-green-500" : "bg-yellow-500"
+                        }`}
+                        style={{ width: `${Math.min((total / latestCutoff) * 100, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {Math.round((total / latestCutoff) * 100)}% of cutoff score
+                    </p>
+                  </>
                 )}
-                <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      total >= LATEST_CUTOFF ? "bg-green-500" : "bg-yellow-500"
-                    }`}
-                    style={{ width: `${Math.min((total / LATEST_CUTOFF) * 100, 100)}%` }}
-                  />
-                </div>
-                <p className="text-xs text-gray-600 mt-1">
-                  {Math.round((total / LATEST_CUTOFF) * 100)}% of cutoff score
-                </p>
               </div>
+
+              {/* Score vs Recent Draws history */}
+              {recentDraws.length > 0 && (
+                <div className="canada-card p-4">
+                  <p className="text-xs uppercase tracking-widest text-gray-500 mb-3">
+                    Your Score vs Last {Math.min(recentDraws.length, 5)} Draws
+                  </p>
+                  <div className="space-y-2">
+                    {recentDraws.slice(0, 5).map((draw, i) => {
+                      const meetsIt = total >= draw.score;
+                      const diff = total - draw.score;
+                      return (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <div
+                            className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                              meetsIt ? "bg-green-500" : "bg-red-500"
+                            }`}
+                          />
+                          <span className="text-gray-500 w-20 flex-shrink-0">
+                            {new Date(draw.date).toLocaleDateString("en-CA", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                          <span className="text-white font-mono font-bold w-8 flex-shrink-0">
+                            {draw.score}
+                          </span>
+                          <span
+                            className={`ml-auto font-semibold ${
+                              meetsIt ? "text-green-400" : "text-red-400"
+                            }`}
+                          >
+                            {diff >= 0 ? `+${diff}` : diff}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-600 mt-3">
+                    Green = your score qualifies · Red = below cutoff
+                  </p>
+                </div>
+              )}
 
               {/* Score breakdown */}
               <div className="canada-card p-4 space-y-3">
