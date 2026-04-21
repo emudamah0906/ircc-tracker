@@ -41,6 +41,44 @@ const DEFAULT: Answers = {
   isStudent: "",
 };
 
+function estimateFSW67(a: Answers): { pts: number; meetsMinimum: boolean } {
+  // Language skills (max 28): per-skill points based on CLB
+  let langPts = 0;
+  if (a.avgCLB >= 9) langPts = 24;
+  else if (a.avgCLB >= 7) langPts = 16;
+  else if (a.avgCLB >= 5) langPts = 8;
+  else langPts = 0;
+
+  // Education (max 25)
+  let eduPts = 0;
+  if (a.education === "masters") eduPts = 23;
+  else if (a.education === "bachelors") eduPts = 21;
+  else if (a.education === "diploma") eduPts = 15;
+  else if (a.education === "highschool") eduPts = 5;
+
+  // Work experience (max 15): foreign years
+  let workPts = 0;
+  if (a.foreignWorkYears >= 6) workPts = 15;
+  else if (a.foreignWorkYears >= 4) workPts = 13;
+  else if (a.foreignWorkYears >= 2) workPts = 11;
+  else if (a.foreignWorkYears >= 1) workPts = 9;
+
+  // Age: we don't collect it, assume prime age (18–35) = 12 pts
+  const agePts = 12;
+
+  // Job offer (max 10)
+  const jobPts = a.hasJobOffer === "yes" ? 10 : 0;
+
+  // Adaptability (max 10): simplified — sibling/spouse counts
+  let adaptPts = 0;
+  if (a.hasFamilyInCanada === "spouse") adaptPts = 5;
+  else if (a.hasFamilyInCanada === "sibling") adaptPts = 5;
+  if (a.hasCanadianWork === "yes") adaptPts = Math.min(10, adaptPts + 5);
+
+  const pts = langPts + eduPts + workPts + agePts + jobPts + adaptPts;
+  return { pts, meetsMinimum: pts >= 67 };
+}
+
 function getPathways(a: Answers): Pathway[] {
   const pathways: Pathway[] = [];
 
@@ -63,18 +101,26 @@ function getPathways(a: Answers): Pathway[] {
 
   // Federal Skilled Worker (FSW)
   if (a.location === "outside" || a.location === "") {
+    const fsw = estimateFSW67(a);
+    const hasBasicFSWReqs = a.foreignWorkYears >= 1 && a.avgCLB >= 7;
     pathways.push({
       name: "Federal Skilled Worker (FSW)",
       icon: "🌍",
-      match: a.foreignWorkYears >= 1 && a.avgCLB >= 7 && (a.education === "bachelors" || a.education === "masters") ? "strong" : a.foreignWorkYears >= 1 ? "possible" : "unlikely",
-      description: "Main path for skilled workers outside Canada. Requires meeting 67-point minimum.",
+      match: hasBasicFSWReqs && (a.education === "bachelors" || a.education === "masters") ? "strong"
+           : hasBasicFSWReqs ? "possible"
+           : "unlikely",
+      description: fsw.meetsMinimum
+        ? `Main path for skilled workers outside Canada. Estimated FSW grid score: ~${fsw.pts}/100 — likely eligible.`
+        : `Main path for skilled workers outside Canada. Estimated FSW grid score: ~${fsw.pts}/100 — you may not meet the 67-point minimum yet.`,
       requirements: [
         "1+ year of continuous skilled work experience (TEER 0, 1, 2, or 3) in the last 10 years",
         "CLB 7 or higher in all language skills",
         "Canadian equivalent education assessment (ECA)",
-        "Score 67+ on FSW point grid",
+        `Score 67+ on FSW point grid (language, education, work exp, age, job offer, adaptability)`,
       ],
-      nextStep: "Get your ECA done, take IELTS/CELPIP, then create an Express Entry FSW profile.",
+      nextStep: fsw.meetsMinimum
+        ? "Get your ECA done, take IELTS/CELPIP, then create an Express Entry FSW profile."
+        : "Focus on improving language scores (worth up to 28 pts) or gaining more work experience to reach 67 points.",
       link: "/crs",
     });
   }
@@ -206,6 +252,7 @@ export default function PathwayPage() {
   }
 
   const pathways = getPathways(answers);
+  const fsw67 = estimateFSW67(answers);
   const progress = ((step + 1) / STEPS.length) * 100;
 
   const matchColors = {
@@ -418,6 +465,18 @@ export default function PathwayPage() {
               <h1 className="text-2xl font-bold">Your Immigration Pathways</h1>
               <p className="text-gray-400 text-sm mt-2">Based on your profile — sorted by best match</p>
             </div>
+
+            {/* FSW 67-point eligibility notice */}
+            {answers.location === "outside" && answers.foreignWorkYears >= 1 && !fsw67.meetsMinimum && (
+              <div className="rounded-xl border border-yellow-700 bg-yellow-900/20 px-4 py-3 mb-4 text-sm">
+                <p className="font-semibold text-yellow-400 mb-1">FSW 67-Point Grid — Action Needed</p>
+                <p className="text-yellow-300 text-xs">
+                  Your estimated FSW grid score is ~<strong>{fsw67.pts}</strong>/100 — below the 67-point minimum.
+                  The biggest gains come from language (+28 pts max) and education (+25 pts max).
+                  Consider retaking IELTS/CELPIP to boost your language score.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-4 mb-6">
               {pathways.filter(p => p.match !== "unlikely").map((p, i) => {
