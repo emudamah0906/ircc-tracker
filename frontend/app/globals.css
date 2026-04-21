@@ -309,6 +309,37 @@ body {
   border-left: 2px solid rgba(213, 43, 30, 0.4);
 }
 
+/* Pulsing live dot animation */
+@keyframes pulse-dot {
+  0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); }
+  70%  { box-shadow: 0 0 0 7px rgba(16,185,129,0); }
+  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+}
+
+/* Skeleton loader shimmer */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s infinite;
+  border-radius: 8px;
+}
+
+/* Glow effect on stat cards */
+.stat-card:hover {
+  box-shadow: 0 0 24px rgba(213,43,30,0.15);
+}
+
+/* Improved canada-card hover glow */
+.canada-card:hover {
+  border-color: rgba(213,43,30,0.3);
+  box-shadow: 0 0 20px rgba(213,43,30,0.08);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

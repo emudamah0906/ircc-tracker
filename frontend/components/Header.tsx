@@ -13,14 +13,14 @@ const NAV_ITEMS = [
 ];
 
 const MORE_TOOLS = [
-  { href: "/pathway", key: "pathway" as ActiveNav, icon: "🗺️", label: "PR Pathway Finder", sub: "Which stream fits you?" },
-  { href: "/pnp", key: "pnp" as ActiveNav, icon: "🏛️", label: "PNP Tracker", sub: "Ontario, BC & Alberta streams" },
-  { href: "/tracker", key: "tracker" as ActiveNav, icon: "⏰", label: "Permit Expiry Tracker", sub: "Never miss your renewal" },
-  { href: "/funds", key: "funds" as ActiveNav, icon: "💰", label: "Proof of Funds", sub: "How much money you need" },
-  { href: "/clb", key: "clb" as ActiveNav, icon: "🔤", label: "CLB Converter", sub: "IELTS / CELPIP → CLB" },
-  { href: "/noc", key: "noc" as ActiveNav, icon: "🔍", label: "NOC Code Finder", sub: "Find your NOC 2021 code" },
-  { href: "/checklist", key: "checklist" as ActiveNav, icon: "📋", label: "Document Checklist", sub: "Know what documents you need" },
-  { href: "/dashboard", key: "dashboard" as ActiveNav, icon: "📊", label: "My Dashboard", sub: "Your PR eligibility" },
+  { href: "/pathway", key: "pathway" as ActiveNav, icon: "🗺️", label: "PR Pathway Finder", sub: "Which stream fits you?", color: "#10b981" },
+  { href: "/pnp", key: "pnp" as ActiveNav, icon: "🏛️", label: "PNP Tracker", sub: "Ontario, BC & Alberta streams", color: "#6366f1" },
+  { href: "/tracker", key: "tracker" as ActiveNav, icon: "⏰", label: "Permit Expiry Tracker", sub: "Never miss your renewal", color: "#f97316" },
+  { href: "/funds", key: "funds" as ActiveNav, icon: "💰", label: "Proof of Funds", sub: "How much money you need", color: "#eab308" },
+  { href: "/clb", key: "clb" as ActiveNav, icon: "🔤", label: "CLB Converter", sub: "IELTS / CELPIP / TEF / TCF → CLB", color: "#06b6d4" },
+  { href: "/noc", key: "noc" as ActiveNav, icon: "🔍", label: "NOC Code Finder", sub: "Find your NOC 2021 code", color: "#ec4899" },
+  { href: "/checklist", key: "checklist" as ActiveNav, icon: "📋", label: "Document Checklist", sub: "Know what documents you need", color: "#14b8a6" },
+  { href: "/dashboard", key: "dashboard" as ActiveNav, icon: "📊", label: "My Dashboard", sub: "Your PR eligibility", color: "#8b5cf6" },
 ];
 
 export default function Header({
@@ -78,11 +78,27 @@ export default function Header({
     <>
       <header className="canada-header px-4 py-3 flex items-center justify-between gap-2">
         {/* Logo */}
-        <a href="/" style={{ textDecoration: "none" }} className="flex-shrink-0">
-          <h1 className="text-xl font-bold text-white leading-tight">🍁 IRCC Tracker</h1>
-          <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">
-            {subtitle || "Canada immigration — updated daily"}
-          </p>
+        <a href="/" style={{ textDecoration: "none" }} className="flex items-center gap-2.5 flex-shrink-0">
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: "linear-gradient(135deg, #d52b1e, #8b0000)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+            boxShadow: "0 2px 12px rgba(213,43,30,0.4)",
+          }}>
+            <svg width="22" height="22" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M32 6 L35.5 18.5 L46.5 15 L41.5 23.5 L54 28 L43.5 31 L47.5 42 L36.5 37 L36.5 56 L27.5 56 L27.5 37 L16.5 42 L20.5 31 L10 28 L22.5 23.5 L17.5 15 L28.5 18.5 Z" fill="white"/>
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-base font-bold leading-tight">
+              <span className="text-white">IRCC</span>
+              <span style={{ color: "#d52b1e" }}> Tracker</span>
+            </h1>
+            <p className="text-xs text-gray-500 hidden sm:block leading-none mt-0.5">
+              {subtitle || "Canada immigration tools"}
+            </p>
+          </div>
         </a>
 
         {/* Desktop nav */}
@@ -120,9 +136,17 @@ export default function Header({
                 {MORE_TOOLS.map(tool => (
                   <a key={tool.href} href={tool.href}
                     onClick={() => setMoreMenu(false)}
-                    style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "8px" }}
+                    style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "10px" }}
                     className={`hover:bg-white/5 transition-colors ${isActive(tool.key) ? "bg-white/5" : ""}`}>
-                    <span style={{ fontSize: "16px", width: "20px", textAlign: "center" }}>{tool.icon}</span>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                      background: `${tool.color}22`,
+                      border: `1px solid ${tool.color}44`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "14px",
+                    }}>
+                      {tool.icon}
+                    </div>
                     <div>
                       <p style={{ fontSize: "12px", fontWeight: 600, color: "#f0f4ff", margin: 0 }}>{tool.label}</p>
                       <p style={{ fontSize: "11px", color: "#6b7280", margin: 0 }}>{tool.sub}</p>
@@ -214,8 +238,21 @@ export default function Header({
           style={{ top: 0 }}>
           {/* Close header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-            <a href="/" style={{ textDecoration: "none" }}>
-              <h1 className="text-xl font-bold text-white">🍁 IRCC Tracker</h1>
+            <a href="/" style={{ textDecoration: "none" }} className="flex items-center gap-2.5">
+              <div style={{
+                width: 32, height: 32, borderRadius: 9,
+                background: "linear-gradient(135deg, #d52b1e, #8b0000)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 2px 8px rgba(213,43,30,0.4)",
+              }}>
+                <svg width="19" height="19" viewBox="0 0 64 64" fill="none">
+                  <path d="M32 6 L35.5 18.5 L46.5 15 L41.5 23.5 L54 28 L43.5 31 L47.5 42 L36.5 37 L36.5 56 L27.5 56 L27.5 37 L16.5 42 L20.5 31 L10 28 L22.5 23.5 L17.5 15 L28.5 18.5 Z" fill="white"/>
+                </svg>
+              </div>
+              <span className="text-base font-bold">
+                <span className="text-white">IRCC</span>
+                <span style={{ color: "#d52b1e" }}> Tracker</span>
+              </span>
             </a>
             <button
               className="p-2 text-gray-400 hover:text-white"
