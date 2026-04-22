@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
-type ActiveNav = "home" | "draws" | "crs" | "pathway" | "tracker" | "funds" | "dashboard" | "pricing" | "processing" | "clb" | "noc" | "checklist" | "pnp";
+type ActiveNav = "home" | "draws" | "crs" | "pathway" | "tracker" | "funds" | "dashboard" | "pricing" | "processing" | "clb" | "noc" | "checklist" | "pnp" | "news";
 
 const NAV_ITEMS = [
   { href: "/", key: "home" as ActiveNav, label: "Processing Times", icon: "⏱" },
