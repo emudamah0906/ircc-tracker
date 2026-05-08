@@ -246,6 +246,344 @@ const PROVINCES: Province[] = [
       "Rural streams offer a pathway for those without urban Canadian experience",
     ],
   },
+  {
+    id: "mb",
+    name: "Manitoba",
+    flag: "🐃",
+    program: "Manitoba Provincial Nominee Program (MPNP)",
+    site: "immigratemanitoba.com",
+    overview: "Points-based program with strong preference for candidates who have family or work ties to Manitoba. Frequent draws for skilled workers, international graduates, and business investors.",
+    streams: [
+      {
+        name: "Skilled Worker in Manitoba (SWM)",
+        type: "base",
+        tag: "Most common",
+        requirements: [
+          "6+ months working in Manitoba on a valid work permit",
+          "Long-term full-time job offer from Manitoba employer",
+          "CLB 4 minimum (CLB 7+ for regulated occupations)",
+          "Education and work experience matching the job offer",
+        ],
+      },
+      {
+        name: "Skilled Worker Overseas — Strategic Recruitment",
+        type: "base",
+        tag: "Outside Canada",
+        requirements: [
+          "Established connection to Manitoba (family, past education or work, or invitation)",
+          "Skilled work experience in an in-demand occupation",
+          "CLB 7+ language proficiency",
+          "Settlement funds",
+        ],
+      },
+      {
+        name: "International Education Stream",
+        type: "base",
+        tag: "International graduates",
+        requirements: [
+          "Recent graduate from a Manitoba post-secondary institution",
+          "Job offer in your field of study OR completed an industry internship",
+          "Career employment pathway in Manitoba",
+        ],
+      },
+      {
+        name: "Business Investor Stream — Entrepreneur Pathway",
+        type: "base",
+        tag: "Entrepreneurs",
+        requirements: [
+          "Net worth of $500,000+",
+          "Business plan to invest at least $250,000 in Winnipeg ($150,000 elsewhere in MB)",
+          "3+ years business owner / senior manager experience",
+          "Exploratory visit to Manitoba",
+        ],
+      },
+    ],
+    tips: [
+      "Manitoba places heavy weight on existing ties — past study, work, or close family in MB significantly improves selection odds",
+      "MPNP runs Expression-of-Interest draws roughly twice a month",
+      "Healthcare, trucking, and trades occupations have been frequent priority categories",
+    ],
+  },
+  {
+    id: "sk",
+    name: "Saskatchewan",
+    flag: "🌾",
+    program: "Saskatchewan Immigrant Nominee Program (SINP)",
+    site: "saskatchewan.ca/immigrating",
+    overview: "Points-based system (max 110) with regular Express Entry-aligned and Occupations In-Demand draws. Strong focus on healthcare, trades, and agriculture.",
+    streams: [
+      {
+        name: "International Skilled Worker — Express Entry",
+        type: "enhanced",
+        tag: "Express Entry aligned",
+        requirements: [
+          "Active Express Entry profile",
+          "1+ year of skilled work experience in an in-demand occupation",
+          "CLB 7+ language proficiency",
+          "Education at the level required for your occupation",
+          "60+ SINP points (100-point grid)",
+        ],
+      },
+      {
+        name: "International Skilled Worker — Occupations In-Demand",
+        type: "base",
+        tag: "Most common",
+        requirements: [
+          "1+ year of work experience in a SINP in-demand occupation",
+          "CLB 4 minimum (varies by occupation)",
+          "Education matching your occupation",
+          "60+ SINP points",
+        ],
+      },
+      {
+        name: "Saskatchewan Experience — Existing Work Permit",
+        type: "base",
+        tag: "Inside Canada",
+        requirements: [
+          "Currently working in Saskatchewan on a valid work permit",
+          "6+ months of SK work experience (varies by occupation type)",
+          "Permanent full-time job offer from your employer",
+        ],
+      },
+      {
+        name: "Hard-to-Fill Skills Pilot",
+        type: "base",
+        tag: "TEER 4–5",
+        requirements: [
+          "Job offer in a designated hard-to-fill occupation (food and beverage, hospitality, retail, etc.)",
+          "1+ year of related work experience",
+          "Currently working in SK or recent graduate from a SK post-secondary",
+        ],
+      },
+    ],
+    tips: [
+      "SK uses an Expression of Interest pool — submit your EOI and wait for invitations",
+      "Healthcare workers and skilled trades have repeatedly seen low score thresholds",
+      "Each draw publishes the minimum SINP score that received an invitation — track them on the SK government site",
+    ],
+  },
+  {
+    id: "ns",
+    name: "Nova Scotia",
+    flag: "🦞",
+    program: "Nova Scotia Nominee Program (NSNP)",
+    site: "novascotiaimmigration.com",
+    overview: "Atlantic-province PNP that runs alongside the Atlantic Immigration Program. Streams target Express Entry candidates, skilled workers with NS job offers, and physicians.",
+    streams: [
+      {
+        name: "Nova Scotia Labour Market Priorities",
+        type: "enhanced",
+        tag: "Express Entry aligned",
+        requirements: [
+          "Active Express Entry profile",
+          "Letter of Interest from NSNP (issued for targeted occupations)",
+          "Skilled work experience matching the targeted NOC",
+          "CLB 7+ language proficiency",
+        ],
+      },
+      {
+        name: "Skilled Worker Stream",
+        type: "base",
+        tag: "Job offer required",
+        requirements: [
+          "Permanent full-time job offer from a NS employer",
+          "1+ year of work experience in the offered occupation",
+          "CLB 5+ for TEER 0/1, CLB 4 for TEER 2/3, CLB 4 for TEER 4 high-demand",
+        ],
+      },
+      {
+        name: "Physician Stream",
+        type: "base",
+        tag: "Healthcare",
+        requirements: [
+          "Approval from the Nova Scotia Health Authority or IWK Health Centre",
+          "Signed return-of-service agreement",
+          "Licensure with the College of Physicians and Surgeons of Nova Scotia",
+        ],
+      },
+      {
+        name: "International Graduates in Demand",
+        type: "base",
+        tag: "International graduates",
+        requirements: [
+          "Recent graduate from a NS post-secondary",
+          "1+ year of full-time work experience in an early-childhood educator or licensed practical nurse role in NS",
+          "Job offer in your field",
+        ],
+      },
+    ],
+    tips: [
+      "Labour Market Priorities draws happen sporadically and target specific NOCs — keep your EE profile updated to receive a Letter of Interest",
+      "The Atlantic Immigration Program is often a faster path than NSNP for candidates with employer endorsements",
+      "Healthcare occupations consistently have the lowest score thresholds",
+    ],
+  },
+  {
+    id: "nb",
+    name: "New Brunswick",
+    flag: "🍁",
+    program: "New Brunswick Provincial Nominee Program (NBPNP)",
+    site: "welcomenb.ca",
+    overview: "Atlantic-province PNP focused on skilled workers with NB ties or job offers, plus Express Entry-aligned draws. The Atlantic Immigration Program also operates here.",
+    streams: [
+      {
+        name: "New Brunswick Express Entry Stream",
+        type: "enhanced",
+        tag: "Express Entry aligned",
+        requirements: [
+          "Active Express Entry profile",
+          "Connection to NB (job offer, family, prior work or study)",
+          "Skilled work experience and CLB 7+ language",
+        ],
+      },
+      {
+        name: "Skilled Worker with Employer Support",
+        type: "base",
+        tag: "Job offer required",
+        requirements: [
+          "Permanent full-time job offer from an NB employer",
+          "1+ year of relevant work experience",
+          "CLB 4 minimum (varies by NOC)",
+        ],
+      },
+      {
+        name: "Strategic Initiative Stream — Francophone",
+        type: "base",
+        tag: "French speakers",
+        requirements: [
+          "CLB 7+ in French (TEF or TCF)",
+          "Connection to NB (work, study, or family)",
+          "Skilled work experience",
+        ],
+      },
+      {
+        name: "Entrepreneurial Stream",
+        type: "base",
+        tag: "Entrepreneurs",
+        requirements: [
+          "Net worth of $600,000+",
+          "Business plan with $250,000+ investment in NB",
+          "3+ years of business ownership experience",
+          "Exploratory visit to NB",
+        ],
+      },
+    ],
+    tips: [
+      "NB heavily favours Francophone candidates — French at CLB 7+ unlocks dedicated streams",
+      "The Atlantic Immigration Program covers many of the same use cases with a faster timeline",
+      "Healthcare and trades job offers carry significant weight",
+    ],
+  },
+  {
+    id: "pe",
+    name: "Prince Edward Island",
+    flag: "🦀",
+    program: "PEI Provincial Nominee Program (PEI PNP)",
+    site: "princeedwardisland.ca/immigration",
+    overview: "PEI runs a points-based EOI system with monthly draws across labour, business, and Express Entry streams. The smallest province PNP by intake but with steady cadence.",
+    streams: [
+      {
+        name: "PEI Express Entry",
+        type: "enhanced",
+        tag: "Express Entry aligned",
+        requirements: [
+          "Active Express Entry profile",
+          "EOI in the PEI pool",
+          "Receive an invitation from PEI in a labour-or-Express-Entry draw",
+        ],
+      },
+      {
+        name: "Skilled Workers in PEI",
+        type: "base",
+        tag: "Most common",
+        requirements: [
+          "Currently working in PEI on a valid work permit",
+          "Permanent full-time job offer from PEI employer",
+          "CLB 4 minimum (varies by NOC)",
+        ],
+      },
+      {
+        name: "International Graduates in PEI",
+        type: "base",
+        tag: "International graduates",
+        requirements: [
+          "Graduated from a PEI post-secondary",
+          "Job offer in your field from a PEI employer",
+          "CLB 4 minimum",
+        ],
+      },
+      {
+        name: "Work Permit Holders — Critical Worker",
+        type: "base",
+        tag: "TEER 4–5",
+        requirements: [
+          "Job offer in trucking, food processing, hospitality, or other critical occupation",
+          "Currently working in PEI on a valid work permit",
+          "6+ months PEI work experience",
+        ],
+      },
+    ],
+    tips: [
+      "PEI runs scheduled monthly EOI draws — the schedule is published in advance",
+      "Healthcare workers and PEI graduates have priority access in most draws",
+      "Most labour-stream candidates need a PEI work permit before being eligible",
+    ],
+  },
+  {
+    id: "nl",
+    name: "Newfoundland & Labrador",
+    flag: "🐋",
+    program: "Newfoundland and Labrador Provincial Nominee Program (NLPNP)",
+    site: "gov.nl.ca/immigration",
+    overview: "Smaller PNP focused on skilled workers with NL job offers, international graduates, and priority occupations. The Atlantic Immigration Program is the main alternative.",
+    streams: [
+      {
+        name: "NL Express Entry Skilled Worker",
+        type: "enhanced",
+        tag: "Express Entry aligned",
+        requirements: [
+          "Active Express Entry profile",
+          "Job offer from a NL employer (or 1 year of high-skilled NL work experience)",
+          "CLB 7+ language proficiency",
+        ],
+      },
+      {
+        name: "Skilled Worker Category",
+        type: "base",
+        tag: "Job offer required",
+        requirements: [
+          "Job offer from a NL employer",
+          "Already working in NL on a valid work permit (or willing to relocate)",
+          "Education and experience matching your job offer",
+        ],
+      },
+      {
+        name: "International Graduate Category",
+        type: "base",
+        tag: "International graduates",
+        requirements: [
+          "Graduated from a NL post-secondary",
+          "Job offer in your field from a NL employer",
+          "Career-path employment plan",
+        ],
+      },
+      {
+        name: "Priority Skills NL",
+        type: "base",
+        tag: "Healthcare",
+        requirements: [
+          "Skills in tech, aquaculture/ocean, or healthcare priority occupations",
+          "Connection to NL (job offer, prior visit, or recruitment-mission contact)",
+          "CLB 7+ language proficiency",
+        ],
+      },
+    ],
+    tips: [
+      "Atlantic Immigration Program is often a faster path — NLPNP is best when AIP isn't available",
+      "Healthcare and tech occupations are the priority focus areas",
+      "NL has limited annual nomination quotas — apply as soon as you receive a Letter of Interest",
+    ],
+  },
 ];
 
 const STREAM_BADGE: Record<string, string> = {
@@ -277,18 +615,19 @@ export default function PNPPage() {
             <span className="text-3xl">🏛️</span>
             <div>
               <h2 className="text-xl font-bold text-white">Provincial Nominee Program (PNP) Tracker</h2>
-              <p className="text-sm text-gray-400">Explore PNP streams for Ontario, BC, and Alberta</p>
+              <p className="text-sm text-gray-400">Explore PNP streams for {PROVINCES.length} Canadian provinces. Quebec runs its own selection program (CSQ) and is not part of PNP.</p>
             </div>
           </div>
         </div>
 
-        {/* Province tabs */}
-        <div className="flex gap-2 mb-4">
+        {/* Province tabs — wrap to multiple rows on smaller screens since
+            we now cover 9 provinces. */}
+        <div className="flex flex-wrap gap-2 mb-4">
           {PROVINCES.map(p => (
             <button
               key={p.id}
               onClick={() => { setActiveProvince(p.id); setExpandedStream(null); }}
-              className="flex-1 px-3 py-3 rounded-xl text-sm font-semibold transition-all"
+              className="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all"
               style={{
                 background: activeProvince === p.id ? "linear-gradient(135deg,#d52b1e,#a01208)" : "rgba(255,255,255,0.06)",
                 color: activeProvince === p.id ? "white" : "#9ca3af",
