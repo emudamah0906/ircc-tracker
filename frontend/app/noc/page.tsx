@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from "react";
 import PageLayout from "@/components/PageLayout";
+import DataFreshness from "@/components/DataFreshness";
+import { NOC_DATASET } from "@/lib/ircc-data";
 
 type NOCEntry = {
   code: string;
@@ -129,9 +131,16 @@ export default function NOCPage() {
             <span className="text-3xl">🔍</span>
             <div>
               <h2 className="text-xl font-bold text-white">NOC Code Finder</h2>
-              <p className="text-sm text-gray-400">Find your NOC 2021 code and check Express Entry eligibility</p>
+              <p className="text-sm text-gray-400">Common Express Entry-eligible occupations. Check TEER level and qualifying programs.</p>
             </div>
           </div>
+          <p className="text-xs text-gray-500 mt-3 leading-relaxed">
+            We list ~70 of the most common Express Entry occupations. The full NOC 2021 has 500+ codes —
+            if your job isn&apos;t here, search the official directory at{" "}
+            <a href="https://noc.esdc.gc.ca/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">
+              noc.esdc.gc.ca →
+            </a>
+          </p>
         </div>
 
         {/* Search + filters */}
@@ -232,6 +241,14 @@ export default function NOCPage() {
             ))
           )}
         </div>
+
+        <DataFreshness
+          lastVerified={NOC_DATASET.lastVerified}
+          source={NOC_DATASET.source}
+          sourceLabel={NOC_DATASET.sourceLabel}
+          cadence={NOC_DATASET.cadence}
+          note={NOC_DATASET.note}
+        />
 
         {/* Cross-tool */}
         <div className="canada-next-step mt-6">

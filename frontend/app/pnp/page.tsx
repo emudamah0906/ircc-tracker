@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import PageLayout from "@/components/PageLayout";
+import DataFreshness from "@/components/DataFreshness";
+import { PNP_DATASET } from "@/lib/ircc-data";
 
 type Stream = {
   name: string;
@@ -378,6 +380,14 @@ export default function PNPPage() {
             Enhanced PNP streams are linked to Express Entry. If nominated, IRCC adds 600 points to your CRS score — virtually guaranteeing an ITA in the next Express Entry draw. You need an active Express Entry profile to apply.
           </p>
         </div>
+
+        <DataFreshness
+          lastVerified={PNP_DATASET.lastVerified}
+          source={PNP_DATASET.source}
+          sourceLabel={PNP_DATASET.sourceLabel}
+          cadence={PNP_DATASET.cadence}
+          note={PNP_DATASET.note}
+        />
 
         {/* Cross-tool banners */}
         <div className="space-y-3">

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import PageLayout from "@/components/PageLayout";
+import DataFreshness from "@/components/DataFreshness";
+import { CLB_TABLES } from "@/lib/ircc-data";
 
 const IELTS_TABLE = [
   { clb: 10, L: 8.5, R: 8.0, W: 7.5, S: 7.5 },
@@ -132,7 +134,7 @@ export default function CLBPage() {
             <span className="text-3xl">🔤</span>
             <div>
               <h2 className="text-xl font-bold text-white">CLB Score Converter</h2>
-              <p className="text-sm text-gray-400">Convert IELTS or CELPIP scores to Canadian Language Benchmarks</p>
+              <p className="text-sm text-gray-400">Turn IELTS, CELPIP, TEF, or TCF results into Canadian Language Benchmarks and CRS points</p>
             </div>
           </div>
         </div>
@@ -380,8 +382,16 @@ export default function CLBPage() {
               <p className="text-xs text-gray-600 mt-2">Listening /699 · Reading /699 · Writing /20 · Speaking /20</p>
             </div>
           )}
-          <p className="text-xs text-gray-600 mt-4">Source: IRCC official language requirements. Scores shown are minimums for each CLB level.</p>
+          <p className="text-xs text-gray-600 mt-4">Scores shown are minimums for each CLB level. CLB 7+ is the floor for FSW and CEC; CLB 9+ earns maximum CRS language points.</p>
         </div>
+
+        <DataFreshness
+          lastVerified={CLB_TABLES.lastVerified}
+          source={CLB_TABLES.source}
+          sourceLabel={CLB_TABLES.sourceLabel}
+          cadence={CLB_TABLES.cadence}
+          note={CLB_TABLES.note}
+        />
 
         {/* Cross-tool banner */}
         <div className="canada-next-step mt-4">
