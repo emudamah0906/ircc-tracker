@@ -5,18 +5,21 @@ import { supabase } from "@/lib/supabase";
 import PageLayout from "@/components/PageLayout";
 import DataFreshness from "@/components/DataFreshness";
 import { CRS_FORMULA } from "@/lib/ircc-data";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type EducationLevel =
-  | "less_than_secondary"
-  | "secondary"
-  | "one_year_diploma"
-  | "two_year_diploma"
-  | "bachelors_or_3yr"
-  | "two_or_more_certs"
-  | "masters"
-  | "doctoral";
+import {
+  AGE_SCORES_NO_SPOUSE,
+  AGE_SCORES_WITH_SPOUSE,
+  EDUCATION_SCORES_NO_SPOUSE,
+  EDUCATION_SCORES_WITH_SPOUSE,
+  FIRST_LANG_NO_SPOUSE,
+  FIRST_LANG_WITH_SPOUSE,
+  SECOND_LANG_SCORES,
+  CANADIAN_WORK_NO_SPOUSE,
+  CANADIAN_WORK_WITH_SPOUSE,
+  SPOUSE_EDUCATION_SCORES,
+  SPOUSE_LANG_SCORES,
+  SPOUSE_CANADIAN_WORK_SCORES,
+  type EducationLevel,
+} from "@/lib/crs";
 
 type CLBScores = {
   reading: number;
@@ -47,95 +50,14 @@ type FormState = {
   foreignWorkPlusCanadianWork: boolean;
 };
 
-// ─── CRS Scoring Tables ───────────────────────────────────────────────────────
-
-// Table 1: Age — with spouse / without spouse
-const AGE_SCORES_NO_SPOUSE: Record<string, number> = {
-  "17_or_less": 0, "18": 99, "19": 105, "20": 110, "21": 110, "22": 110,
-  "23": 110, "24": 110, "25": 110, "26": 110, "27": 110, "28": 110,
-  "29": 110, "30": 105, "31": 99, "32": 94, "33": 88, "34": 83,
-  "35": 77, "36": 72, "37": 66, "38": 61, "39": 55, "40": 50,
-  "41": 39, "42": 28, "43": 17, "44": 6, "45_or_more": 0,
-};
-
-const AGE_SCORES_WITH_SPOUSE: Record<string, number> = {
-  "17_or_less": 0, "18": 90, "19": 95, "20": 100, "21": 100, "22": 100,
-  "23": 100, "24": 100, "25": 100, "26": 100, "27": 100, "28": 100,
-  "29": 100, "30": 95, "31": 90, "32": 85, "33": 80, "34": 75,
-  "35": 70, "36": 65, "37": 60, "38": 55, "39": 50, "40": 45,
-  "41": 35, "42": 25, "43": 15, "44": 5, "45_or_more": 0,
-};
+// CRS scoring tables are imported from lib/crs.ts above. The page-level
+// helpers below adapt those tables to the FormState shape used by the UI.
 
 function getAgeKey(age: number): string {
   if (age <= 17) return "17_or_less";
   if (age >= 45) return "45_or_more";
   return String(age);
 }
-
-// Table 2: Education — with spouse / without spouse
-const EDUCATION_SCORES_NO_SPOUSE: Record<EducationLevel, number> = {
-  less_than_secondary: 0,
-  secondary: 28,
-  one_year_diploma: 84,
-  two_year_diploma: 91,
-  bachelors_or_3yr: 112,
-  two_or_more_certs: 119,
-  masters: 126,
-  doctoral: 140,
-};
-
-const EDUCATION_SCORES_WITH_SPOUSE: Record<EducationLevel, number> = {
-  less_than_secondary: 0,
-  secondary: 25,
-  one_year_diploma: 68,
-  two_year_diploma: 78,
-  bachelors_or_3yr: 84,
-  two_or_more_certs: 91,
-  masters: 112,
-  doctoral: 119,
-};
-
-// Table 3: First official language — without spouse (CLB → points per skill)
-// Each skill scored separately, then summed
-const FIRST_LANG_NO_SPOUSE: Record<number, number> = {
-  4: 6, 5: 6, 6: 9, 7: 17, 8: 23, 9: 31, 10: 34,
-};
-const FIRST_LANG_WITH_SPOUSE: Record<number, number> = {
-  4: 6, 5: 6, 6: 8, 7: 16, 8: 22, 9: 29, 10: 32,
-};
-
-// Table 4: Second official language — same for both (capped at CLB 5+)
-const SECOND_LANG_SCORES: Record<number, number> = {
-  4: 0, 5: 1, 6: 1, 7: 3, 8: 3, 9: 6, 10: 6,
-};
-
-// Table 5: Canadian work experience — without / with spouse
-const CANADIAN_WORK_NO_SPOUSE: Record<number, number> = {
-  0: 0, 1: 40, 2: 53, 3: 64, 4: 72, 5: 80,
-};
-const CANADIAN_WORK_WITH_SPOUSE: Record<number, number> = {
-  0: 0, 1: 35, 2: 46, 3: 56, 4: 63, 5: 70,
-};
-
-// Spouse factors
-const SPOUSE_EDUCATION_SCORES: Record<EducationLevel, number> = {
-  less_than_secondary: 0,
-  secondary: 2,
-  one_year_diploma: 6,
-  two_year_diploma: 7,
-  bachelors_or_3yr: 8,
-  two_or_more_certs: 9,
-  masters: 10,
-  doctoral: 10,
-};
-
-const SPOUSE_LANG_SCORES: Record<number, number> = {
-  4: 0, 5: 1, 6: 1, 7: 3, 8: 3, 9: 5, 10: 5,
-};
-
-const SPOUSE_CANADIAN_WORK_SCORES: Record<number, number> = {
-  0: 0, 1: 5, 2: 7, 3: 8, 4: 9, 5: 10,
-};
 
 // ─── Skill Transferability ─────────────────────────────────────────────────────
 // Education + language (first lang CLB 7+)

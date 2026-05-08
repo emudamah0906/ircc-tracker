@@ -5,13 +5,23 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PageLayout from "@/components/PageLayout";
 import type { User } from "@supabase/supabase-js";
-
-type LangTest = "ielts" | "celpip";
+import {
+  getAgePoints,
+  getEducationPoints,
+  getFirstLangPoints,
+  getCanadianWorkPoints,
+  getSpouseEducationPoints,
+  getSpouseLangPoints,
+  getSpouseCanadianWorkPoints,
+  rawScoreToClb,
+  type EducationLevel,
+  type LangTest,
+} from "@/lib/crs";
 
 type Profile = {
   age: number;
   marital_status: "single" | "married";
-  education: string;
+  education: EducationLevel;
   lang_test: LangTest;
   first_lang_reading: number;
   first_lang_writing: number;
@@ -24,7 +34,7 @@ type Profile = {
   has_job_offer: boolean;
   has_canadian_sibling: boolean;
   // Spouse
-  spouse_education: string;
+  spouse_education: EducationLevel;
   spouse_lang_reading: number;
   spouse_lang_writing: number;
   spouse_lang_listening: number;
@@ -35,7 +45,7 @@ type Profile = {
 const DEFAULT_PROFILE: Profile = {
   age: 28,
   marital_status: "single",
-  education: "bachelors",
+  education: "bachelors_or_3yr",
   lang_test: "ielts",
   first_lang_reading: 7,
   first_lang_writing: 7,
@@ -47,7 +57,7 @@ const DEFAULT_PROFILE: Profile = {
   has_provincial_nomination: false,
   has_job_offer: false,
   has_canadian_sibling: false,
-  spouse_education: "bachelors",
+  spouse_education: "bachelors_or_3yr",
   spouse_lang_reading: 5,
   spouse_lang_writing: 5,
   spouse_lang_listening: 5,
@@ -55,100 +65,61 @@ const DEFAULT_PROFILE: Profile = {
   spouse_canada_work_years: 0,
 };
 
-// ── Language score → CLB conversion ─────────────────────────────────────────
-function toClb(score: number, test: LangTest): number {
-  if (test === "celpip") {
-    // CELPIP score is directly CLB (1–12, cap at 10)
-    return Math.min(10, Math.max(1, Math.round(score)));
-  }
-  // IELTS General → CLB (simplified, per IRCC official table)
-  if (score >= 8.5) return 10;
-  if (score >= 8.0) return 9;
-  if (score >= 7.0) return 8;
-  if (score >= 6.5) return 7;
-  if (score >= 6.0) return 6;
-  if (score >= 5.5) return 5;
-  if (score >= 5.0) return 4;
-  return 3;
+/** Normalize legacy education values stored in older saved profiles. */
+function normalizeEducation(value: string | undefined | null): EducationLevel {
+  if (value === "bachelors") return "bachelors_or_3yr";
+  const valid: EducationLevel[] = [
+    "less_than_secondary", "secondary", "one_year_diploma", "two_year_diploma",
+    "bachelors_or_3yr", "two_or_more_certs", "masters", "doctoral",
+  ];
+  return (valid.includes(value as EducationLevel) ? value : "bachelors_or_3yr") as EducationLevel;
 }
 
-// ── CRS Calculation ───────────────────────────────────────────────────────────
+// ── CRS Calculation — shape adapter that wraps lib/crs helpers ────────────────
 function calcCRS(p: Profile): { total: number; breakdown: Record<string, number> } {
   const hasSpouse = p.marital_status === "married";
   const breakdown: Record<string, number> = {};
 
-  // ── A: Core Human Capital ────────────────────────────────────────────────
-  const agePoints: Record<number, [number, number]> = {
-    17: [0,0], 18: [99,90], 19: [105,95], 20: [110,100], 21: [110,100],
-    22: [110,100], 23: [110,100], 24: [110,100], 25: [110,100], 26: [110,100],
-    27: [110,100], 28: [110,100], 29: [110,100], 30: [105,95], 31: [99,90],
-    32: [94,85], 33: [88,80], 34: [83,75], 35: [77,70], 36: [72,65],
-    37: [66,60], 38: [61,55], 39: [55,50], 40: [50,45], 41: [39,35],
-    42: [28,25], 43: [17,15], 44: [6,5],
-  };
-  const ageKey = Math.min(44, Math.max(17, p.age));
-  breakdown.age = hasSpouse ? (agePoints[ageKey]?.[1] ?? 0) : (agePoints[ageKey]?.[0] ?? 0);
+  // A: Core human capital
+  breakdown.age = getAgePoints(p.age, hasSpouse);
+  breakdown.education = getEducationPoints(p.education, hasSpouse);
 
-  const eduMap: Record<string, [number, number]> = {
-    less_than_secondary: [0,0], secondary: [30,28], one_year_diploma: [90,84],
-    two_year_diploma: [98,91], bachelors: [120,112], two_or_more_certs: [128,119],
-    masters: [135,126], doctoral: [150,140],
-  };
-  breakdown.education = hasSpouse ? (eduMap[p.education]?.[1] ?? 120) : (eduMap[p.education]?.[0] ?? 120);
+  const r = rawScoreToClb(p.first_lang_reading, p.lang_test);
+  const w = rawScoreToClb(p.first_lang_writing, p.lang_test);
+  const l = rawScoreToClb(p.first_lang_listening, p.lang_test);
+  const s = rawScoreToClb(p.first_lang_speaking, p.lang_test);
+  breakdown.language =
+    getFirstLangPoints(r, hasSpouse) +
+    getFirstLangPoints(w, hasSpouse) +
+    getFirstLangPoints(l, hasSpouse) +
+    getFirstLangPoints(s, hasSpouse);
 
-  // Language — first official language
-  const r = toClb(p.first_lang_reading, p.lang_test);
-  const w = toClb(p.first_lang_writing, p.lang_test);
-  const l = toClb(p.first_lang_listening, p.lang_test);
-  const s = toClb(p.first_lang_speaking, p.lang_test);
+  breakdown.canadaWork = getCanadianWorkPoints(p.canada_work_years, hasSpouse);
 
-  const langMap: Record<number, [number, number]> = {
-    10: [34,32], 9: [31,29], 8: [23,22], 7: [17,16], 6: [9,8], 5: [1,1],
-  };
-  const langPts = (clb: number) => hasSpouse ? (langMap[Math.min(10,clb)]?.[1] ?? 0) : (langMap[Math.min(10,clb)]?.[0] ?? 0);
-  breakdown.language = langPts(r) + langPts(w) + langPts(l) + langPts(s);
-
-  const canWorkMap: Record<number, [number, number]> = {
-    0: [0,0], 1: [40,35], 2: [53,46], 3: [64,56], 4: [72,63], 5: [80,70],
-  };
-  breakdown.canadaWork = hasSpouse
-    ? (canWorkMap[Math.min(5, p.canada_work_years)]?.[1] ?? 0)
-    : (canWorkMap[Math.min(5, p.canada_work_years)]?.[0] ?? 0);
-
-  // ── B: Spouse / Common-Law Partner Factors ───────────────────────────────
+  // B: Spouse factors
   breakdown.spouse = 0;
   if (hasSpouse) {
-    // Spouse education (max 10)
-    const spouseEduMap: Record<string, number> = {
-      less_than_secondary: 0, secondary: 2, one_year_diploma: 6,
-      two_year_diploma: 7, bachelors: 8, two_or_more_certs: 9,
-      masters: 10, doctoral: 10,
-    };
-    breakdown.spouse += spouseEduMap[p.spouse_education] ?? 8;
-
-    // Spouse language CLB (max 20 — 5 per skill)
-    const spouseLangMap: Record<number, number> = { 10: 5, 9: 5, 8: 3, 7: 3, 6: 1, 5: 1 };
-    const sr = toClb(p.spouse_lang_reading, p.lang_test);
-    const sw = toClb(p.spouse_lang_writing, p.lang_test);
-    const sl = toClb(p.spouse_lang_listening, p.lang_test);
-    const ss = toClb(p.spouse_lang_speaking, p.lang_test);
-    breakdown.spouse += (spouseLangMap[Math.min(10,sr)] ?? 0) + (spouseLangMap[Math.min(10,sw)] ?? 0)
-      + (spouseLangMap[Math.min(10,sl)] ?? 0) + (spouseLangMap[Math.min(10,ss)] ?? 0);
-
-    // Spouse Canadian work exp (max 10)
-    const spouseWorkMap: Record<number, number> = { 0: 0, 1: 5, 2: 7, 3: 8, 4: 9, 5: 10 };
-    breakdown.spouse += spouseWorkMap[Math.min(5, p.spouse_canada_work_years)] ?? 0;
+    breakdown.spouse += getSpouseEducationPoints(p.spouse_education);
+    const sr = rawScoreToClb(p.spouse_lang_reading, p.lang_test);
+    const sw = rawScoreToClb(p.spouse_lang_writing, p.lang_test);
+    const sl = rawScoreToClb(p.spouse_lang_listening, p.lang_test);
+    const ss = rawScoreToClb(p.spouse_lang_speaking, p.lang_test);
+    breakdown.spouse +=
+      getSpouseLangPoints(sr) + getSpouseLangPoints(sw) +
+      getSpouseLangPoints(sl) + getSpouseLangPoints(ss);
+    breakdown.spouse += getSpouseCanadianWorkPoints(p.spouse_canada_work_years);
   }
 
-  // ── C: Skill Transferability (max 100) ────────────────────────────────────
+  // C: Skill transferability (max 100)
   let transferability = 0;
   const avgCLB = (r + w + l + s) / 4;
-  const highEdu = ["bachelors", "two_or_more_certs", "masters", "doctoral"].includes(p.education);
+  const highEdu: EducationLevel[] = ["bachelors_or_3yr", "two_or_more_certs", "masters", "doctoral"];
+  const isHighEdu = highEdu.includes(p.education);
 
-  if (highEdu && avgCLB >= 9) transferability += 50;
-  else if (highEdu && avgCLB >= 7) transferability += 25;
+  if (isHighEdu && avgCLB >= 9) transferability += 50;
+  else if (isHighEdu && avgCLB >= 7) transferability += 25;
 
-  if (highEdu && p.canada_work_years >= 1) transferability += 25;
+  if (isHighEdu && p.canada_work_years >= 1) transferability += 25;
 
   if (p.foreign_work_years >= 3 && p.canada_work_years >= 1) transferability += 25;
   else if (p.foreign_work_years >= 1 && p.canada_work_years >= 1) transferability += 13;
@@ -158,7 +129,7 @@ function calcCRS(p: Profile): { total: number; breakdown: Record<string, number>
 
   breakdown.transferability = Math.min(100, transferability);
 
-  // ── D: Additional Points ─────────────────────────────────────────────────
+  // D: Additional points
   breakdown.additional = 0;
   if (p.has_provincial_nomination) breakdown.additional += 600;
   if (p.has_job_offer) breakdown.additional += 50;
@@ -175,8 +146,8 @@ function calcCRS(p: Profile): { total: number; breakdown: Record<string, number>
 function getTips(p: Profile, score: number, cutoff: number): string[] {
   const tips: string[] = [];
   const gap = cutoff - score;
-  const avgCLB = (toClb(p.first_lang_reading, p.lang_test) + toClb(p.first_lang_writing, p.lang_test) +
-    toClb(p.first_lang_listening, p.lang_test) + toClb(p.first_lang_speaking, p.lang_test)) / 4;
+  const avgCLB = (rawScoreToClb(p.first_lang_reading, p.lang_test) + rawScoreToClb(p.first_lang_writing, p.lang_test) +
+    rawScoreToClb(p.first_lang_listening, p.lang_test) + rawScoreToClb(p.first_lang_speaking, p.lang_test)) / 4;
 
   if (!p.has_provincial_nomination)
     tips.push("🏆 Provincial Nomination (PNP) adds 600 pts instantly — explore OINP, BC PNP, AINP");
@@ -204,7 +175,7 @@ const EDU_OPTIONS = [
   { value: "secondary", label: "Secondary (High School)" },
   { value: "one_year_diploma", label: "1-Year Diploma / Certificate" },
   { value: "two_year_diploma", label: "2-Year Diploma / Certificate" },
-  { value: "bachelors", label: "Bachelor's Degree (3–4 years)" },
+  { value: "bachelors_or_3yr", label: "Bachelor's Degree (3–4 years)" },
   { value: "two_or_more_certs", label: "Two or More Certificates" },
   { value: "masters", label: "Master's Degree" },
   { value: "doctoral", label: "PhD / Doctoral" },
@@ -227,7 +198,14 @@ export default function Dashboard() {
       if (!u) { router.push("/auth"); return; }
       setUser(u);
       const { data: existing } = await supabase.from("user_profiles").select("*").eq("id", u.id).single();
-      if (existing) setProfile({ ...DEFAULT_PROFILE, ...existing });
+      if (existing) {
+        setProfile({
+          ...DEFAULT_PROFILE,
+          ...existing,
+          education: normalizeEducation(existing.education),
+          spouse_education: normalizeEducation(existing.spouse_education),
+        });
+      }
       setLoadingProfile(false);
     });
     supabase.from("pr_draws").select("crs_score, draw_date").is("province", null)
@@ -305,7 +283,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Highest Education Level</label>
-                <select value={profile.education} onChange={e => update("education", e.target.value)} className="canada-input py-2 text-sm">
+                <select value={profile.education} onChange={e => update("education", e.target.value as EducationLevel)} className="canada-input py-2 text-sm">
                   {EDU_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
@@ -337,7 +315,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-4">
                 {(["first_lang_reading","first_lang_writing","first_lang_listening","first_lang_speaking"] as const).map(key => {
                   const skill = key.replace("first_lang_","");
-                  const clb = toClb(profile[key], profile.lang_test);
+                  const clb = rawScoreToClb(profile[key], profile.lang_test);
                   return (
                     <div key={key}>
                       <label className="text-xs text-gray-400 mb-1 block capitalize">
@@ -364,7 +342,7 @@ export default function Dashboard() {
 
                 <div>
                   <label className="text-xs text-gray-400 mb-1 block">Spouse Education</label>
-                  <select value={profile.spouse_education} onChange={e => update("spouse_education", e.target.value)} className="canada-input py-2 text-sm">
+                  <select value={profile.spouse_education} onChange={e => update("spouse_education", e.target.value as EducationLevel)} className="canada-input py-2 text-sm">
                     {EDU_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
@@ -374,7 +352,7 @@ export default function Dashboard() {
                   <div className="grid grid-cols-2 gap-3">
                     {(["spouse_lang_reading","spouse_lang_writing","spouse_lang_listening","spouse_lang_speaking"] as const).map(key => {
                       const skill = key.replace("spouse_lang_","");
-                      const clb = toClb(profile[key], profile.lang_test);
+                      const clb = rawScoreToClb(profile[key], profile.lang_test);
                       return (
                         <div key={key}>
                           <label className="text-xs text-gray-500 mb-1 block capitalize">
