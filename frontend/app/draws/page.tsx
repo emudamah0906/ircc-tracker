@@ -8,6 +8,8 @@ import {
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 
+const IRCC_DRAWS_URL = "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/submit-profile/rounds-invitations.html";
+
 type Draw = {
   id: number;
   draw_number: number;
@@ -91,8 +93,41 @@ export default function DrawsPage() {
       {/* Page heading */}
       <div>
         <h1 className="text-2xl font-bold">🗳 PR Draws</h1>
-        <p className="text-gray-400 text-sm mt-1">Express Entry & Provincial Nominee Program draw results</p>
+        <p className="text-gray-400 text-sm mt-1">
+          Express Entry & Provincial Nominee Program draw results — synced from IRCC.{" "}
+          <a href={IRCC_DRAWS_URL} target="_blank" rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300">
+            View official IRCC page →
+          </a>
+        </p>
       </div>
+
+      {/* What the program codes mean — collapsed by default */}
+      <details className="canada-card p-4">
+        <summary className="text-sm font-semibold text-white cursor-pointer">
+          ℹ️ What do the program codes mean?
+        </summary>
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-300">
+          <div>
+            <strong className="text-white">CEC</strong> · Canadian Experience Class — for people with skilled work experience in Canada.
+          </div>
+          <div>
+            <strong className="text-white">FSW</strong> · Federal Skilled Worker — for skilled workers outside Canada.
+          </div>
+          <div>
+            <strong className="text-white">FST</strong> · Federal Skilled Trades — for trades workers (electricians, welders, etc.).
+          </div>
+          <div>
+            <strong className="text-white">PNP</strong> · Provincial Nominee Program — provinces nominate candidates with ties to them.
+          </div>
+          <div className="sm:col-span-2">
+            <strong className="text-white">Category-based draws</strong> · IRCC selects candidates by occupation (Healthcare, STEM, Trades, Transport, Agriculture, French) regardless of program. Cut-offs in these draws are usually lower.
+          </div>
+          <div className="sm:col-span-2">
+            <strong className="text-white">CRS Cut-off</strong> · The lowest score that received an invitation. Your score must equal or exceed this to be invited in a similar draw.
+          </div>
+        </div>
+      </details>
 
       {/* Next Draw Countdown */}
       {latestDraw && (() => {
@@ -121,8 +156,8 @@ export default function DrawsPage() {
                 </p>
               )}
               <p className="text-xs text-gray-500 mt-1">
-                Based on 14-day draw cycle · Last draw{' '}
-                {latestDate.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}
+                Estimate based on the typical 14-day cycle. IRCC can pause or shift draws without notice — last draw{' '}
+                {latestDate.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}.
               </p>
             </div>
           </div>
@@ -326,6 +361,27 @@ export default function DrawsPage() {
         </div>
         <span className="text-gray-400 text-sm whitespace-nowrap">Find Pathway →</span>
       </a>
+
+      {/* Source */}
+      <div className="rounded-xl p-4 mt-4"
+        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="flex items-start gap-2.5">
+          <span className="text-base leading-none mt-0.5">ℹ️</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-300">
+              <span className="font-semibold text-white">Live data from IRCC</span>
+              <span className="text-gray-500"> · Synced shortly after each draw is published</span>
+            </p>
+            <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
+              Draws are pulled directly from canada.ca. Not affiliated with IRCC.
+            </p>
+            <a href={IRCC_DRAWS_URL} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-2">
+              Verify on canada.ca · Express Entry rounds →
+            </a>
+          </div>
+        </div>
+      </div>
     </PageLayout>
   );
 }

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import PageLayout from "@/components/PageLayout";
+import DataFreshness from "@/components/DataFreshness";
+import { CHECKLIST_DATASET } from "@/lib/ircc-data";
 
 type ChecklistItem = { id: string; label: string; note?: string; required: boolean };
 type ChecklistCategory = { title: string; items: ChecklistItem[] };
@@ -456,14 +458,26 @@ export default function ChecklistPage() {
               </div>
             )}
 
-            <button
-              onClick={() => {
-                if (visaType) { localStorage.removeItem(STORAGE_KEY + visaType); setChecked({}); }
-              }}
-              className="mt-3 w-full text-xs text-gray-600 py-2 hover:text-gray-400 transition-colors"
-            >
-              Reset checklist
-            </button>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => window.print()}
+                className="flex-1 canada-pill text-xs py-2"
+              >
+                🖨 Print / Save as PDF
+              </button>
+              <button
+                onClick={() => {
+                  if (!visaType) return;
+                  if (!confirm("Reset this checklist? Your saved progress for this visa type will be cleared.")) return;
+                  localStorage.removeItem(STORAGE_KEY + visaType);
+                  setChecked({});
+                }}
+                className="flex-1 text-xs text-gray-500 py-2 hover:text-gray-300 transition-colors rounded-xl"
+                style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                Reset checklist
+              </button>
+            </div>
           </>
         )}
 
@@ -485,6 +499,14 @@ export default function ChecklistPage() {
             Pathway Finder →
           </a>
         </div>
+
+        <DataFreshness
+          lastVerified={CHECKLIST_DATASET.lastVerified}
+          source={CHECKLIST_DATASET.source}
+          sourceLabel={CHECKLIST_DATASET.sourceLabel}
+          cadence={CHECKLIST_DATASET.cadence}
+          note={CHECKLIST_DATASET.note}
+        />
       </div>
     </PageLayout>
   );
