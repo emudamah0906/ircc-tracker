@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import PageLayout from "@/components/PageLayout";
+import { TOOLS, type ToolKey } from "@/lib/tools";
 
 export const metadata: Metadata = {
   title: "About — IRCC Tracker",
@@ -12,35 +13,21 @@ const FOUNDER = {
   brandInstagram: "https://www.instagram.com/ircc_tracker",
 };
 
-const TOOL_CATEGORIES = [
+const TOOL_CATEGORIES: { title: string; icon: string; keys: ToolKey[] }[] = [
   {
     title: "Track the system",
     icon: "📊",
-    tools: [
-      { href: "/draws", label: "PR Draws", desc: "Every Express Entry & PNP draw, the moment IRCC publishes it." },
-      { href: "/", label: "Processing Times", desc: "Visa wait times for 180+ countries, refreshed daily." },
-      { href: "/news", label: "IRCC News", desc: "Official immigration news, plain-English summaries." },
-    ],
+    keys: ["draws", "home", "news", "tracker"],
   },
   {
     title: "Check your eligibility",
     icon: "🧮",
-    tools: [
-      { href: "/crs", label: "CRS Calculator", desc: "Score yourself against the latest cut-off in 60 seconds." },
-      { href: "/clb", label: "CLB Converter", desc: "Turn IELTS / CELPIP / TEF / TCF into CLB + CRS points." },
-      { href: "/funds", label: "Proof of Funds", desc: "How much money IRCC requires for your family size." },
-      { href: "/noc", label: "NOC Code Finder", desc: "Find the right NOC 2021 code for your job." },
-    ],
+    keys: ["crs", "clb", "funds", "noc"],
   },
   {
     title: "Plan your path",
     icon: "🗺️",
-    tools: [
-      { href: "/pathway", label: "Pathway Finder", desc: "8 questions, the right immigration stream for you." },
-      { href: "/pnp", label: "PNP Tracker", desc: "Provincial nominee programs — Ontario, BC, Alberta and more." },
-      { href: "/tracker", label: "Permit Expiry Tracker", desc: "Get notified before your work or study permit expires." },
-      { href: "/checklist", label: "Document Checklist", desc: "Know exactly what to submit, by visa type." },
-    ],
+    keys: ["pathway", "pnp", "checklist", "dashboard"],
   },
 ];
 
@@ -85,17 +72,23 @@ export default function AboutPage() {
               <h3 className="text-base font-semibold text-white">{cat.title}</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {cat.tools.map((t) => (
-                <a
-                  key={t.href}
-                  href={t.href}
-                  className="canada-feature-card p-4 hover:border-red-500/40 transition-colors"
-                  style={{ textDecoration: "none" }}
-                >
-                  <p className="text-sm font-semibold text-white">{t.label}</p>
-                  <p className="text-xs text-gray-400 mt-1 leading-relaxed">{t.desc}</p>
-                </a>
-              ))}
+              {cat.keys.map((key) => {
+                const t = TOOLS[key];
+                return (
+                  <a
+                    key={t.href}
+                    href={t.href}
+                    className="canada-feature-card p-4 hover:border-red-500/40 transition-colors"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <p className="text-sm font-semibold text-white">
+                      <span className="mr-1.5">{t.icon}</span>
+                      {t.label}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">{t.long}</p>
+                  </a>
+                );
+              })}
             </div>
           </div>
         ))}

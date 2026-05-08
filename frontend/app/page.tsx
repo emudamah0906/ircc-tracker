@@ -256,15 +256,11 @@ export default function Home() {
             {/* ── JOURNEY PICKER ── */}
             <JourneyPicker onSelectLocation={handleJourneySelect} />
 
-            {/* ── TOOL SHOWCASE ── */}
-            <ToolShowcase />
-
-            {/* ── STATS BAR ── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* ── LIVE STATS (real numbers from the data, not the marketing copy in the hero) ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[
-                { label: "Countries Tracked", value: uniqueCountries, icon: "🌍" },
-                { label: "Visa Types", value: uniqueVisaTypes, icon: "📋" },
-                { label: "Updated", value: "Daily", icon: "🔄" },
+                { label: "Countries with live data", value: uniqueCountries, icon: "🌍" },
+                { label: "Visa types tracked", value: uniqueVisaTypes, icon: "📋" },
                 { label: "Latest CRS Cut-off", value: latestCRS ?? "—", icon: "🏆", href: "/draws" },
               ].map((stat) => (
                 <a
@@ -279,6 +275,9 @@ export default function Home() {
                 </a>
               ))}
             </div>
+
+            {/* ── TOOL SHOWCASE ── */}
+            <ToolShowcase />
 
             {/* ── LATEST DRAW TEASER ── */}
             {latestCRS && latestDrawDate && (

@@ -3,26 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import {
+  TOOLS,
+  HEADER_PRIMARY,
+  HEADER_MORE,
+  MOBILE_GROUPS,
+  type ToolKey,
+} from "@/lib/tools";
 
-type ActiveNav = "home" | "draws" | "crs" | "pathway" | "tracker" | "funds" | "dashboard" | "pricing" | "processing" | "clb" | "noc" | "checklist" | "pnp" | "news" | "about";
-
-const NAV_ITEMS = [
-  { href: "/", key: "home" as ActiveNav, label: "Processing Times", icon: "⏱" },
-  { href: "/draws", key: "draws" as ActiveNav, label: "PR Draws", icon: "🗳" },
-  { href: "/crs", key: "crs" as ActiveNav, label: "CRS Calculator", icon: "🧮" },
-];
-
-const MORE_TOOLS = [
-  { href: "/pathway", key: "pathway" as ActiveNav, icon: "🗺️", label: "PR Pathway Finder", sub: "Which stream fits you?", color: "#10b981" },
-  { href: "/pnp", key: "pnp" as ActiveNav, icon: "🏛️", label: "PNP Tracker", sub: "Ontario, BC & Alberta streams", color: "#6366f1" },
-  { href: "/tracker", key: "tracker" as ActiveNav, icon: "⏰", label: "Permit Expiry Tracker", sub: "Never miss your renewal", color: "#f97316" },
-  { href: "/funds", key: "funds" as ActiveNav, icon: "💰", label: "Proof of Funds", sub: "How much money you need", color: "#eab308" },
-  { href: "/clb", key: "clb" as ActiveNav, icon: "🔤", label: "CLB Converter", sub: "IELTS / CELPIP / TEF / TCF → CLB", color: "#06b6d4" },
-  { href: "/noc", key: "noc" as ActiveNav, icon: "🔍", label: "NOC Code Finder", sub: "Find your NOC 2021 code", color: "#ec4899" },
-  { href: "/checklist", key: "checklist" as ActiveNav, icon: "📋", label: "Document Checklist", sub: "Know what documents you need", color: "#14b8a6" },
-  { href: "/dashboard", key: "dashboard" as ActiveNav, icon: "📊", label: "My Dashboard", sub: "Your PR eligibility", color: "#8b5cf6" },
-  { href: "/about", key: "about" as ActiveNav, icon: "🍁", label: "About IRCC Tracker", sub: "Why we built this", color: "#d52b1e" },
-];
+// Legacy alias — pages still pass "processing" for the home tab.
+export type ActiveNav = ToolKey | "processing";
 
 export default function Header({
   subtitle,
@@ -73,7 +63,10 @@ export default function Header({
   }
 
   const initials = user?.email?.slice(0, 2).toUpperCase() ?? "";
-  const isActive = (key: ActiveNav) => activeNav === key || (activeNav === "processing" && key === "home");
+  const isActive = (key: ToolKey) =>
+    activeNav === key || (activeNav === "processing" && key === "home");
+
+  const moreActive = HEADER_MORE.some((k) => isActive(k));
 
   return (
     <>
@@ -104,22 +97,25 @@ export default function Header({
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
-          {NAV_ITEMS.map((item) => (
-            <a
-              key={item.key}
-              href={item.href}
-              className={`canada-nav-link ${isActive(item.key) ? "active" : ""}`}
-            >
-              <span className="text-sm">{item.icon}</span>
-              {item.label}
-            </a>
-          ))}
+          {HEADER_PRIMARY.map((key) => {
+            const t = TOOLS[key];
+            return (
+              <a
+                key={t.key}
+                href={t.href}
+                className={`canada-nav-link ${isActive(t.key) ? "active" : ""}`}
+              >
+                <span className="text-sm">{t.icon}</span>
+                {t.label}
+              </a>
+            );
+          })}
 
           {/* More Tools dropdown */}
           <div className="relative" ref={moreMenuRef}>
             <button
               onClick={() => { setMoreMenu(m => !m); setUserMenu(false); }}
-              className={`canada-nav-link ${MORE_TOOLS.some(t => isActive(t.key)) ? "active" : ""}`}
+              className={`canada-nav-link ${moreActive ? "active" : ""}`}
             >
               More Tools
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,29 +127,32 @@ export default function Header({
               <div style={{
                 position: "absolute", right: 0, top: "calc(100% + 6px)",
                 background: "#0d1b35", border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: "14px", padding: "8px", minWidth: "240px", zIndex: 200,
+                borderRadius: "14px", padding: "8px", minWidth: "260px", zIndex: 200,
                 boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
               }}>
-                {MORE_TOOLS.map(tool => (
-                  <a key={tool.href} href={tool.href}
-                    onClick={() => setMoreMenu(false)}
-                    style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "10px" }}
-                    className={`hover:bg-white/5 transition-colors ${isActive(tool.key) ? "bg-white/5" : ""}`}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                      background: `${tool.color}22`,
-                      border: `1px solid ${tool.color}44`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "14px",
-                    }}>
-                      {tool.icon}
-                    </div>
-                    <div>
-                      <p style={{ fontSize: "12px", fontWeight: 600, color: "#f0f4ff", margin: 0 }}>{tool.label}</p>
-                      <p style={{ fontSize: "11px", color: "#6b7280", margin: 0 }}>{tool.sub}</p>
-                    </div>
-                  </a>
-                ))}
+                {HEADER_MORE.map((key) => {
+                  const tool = TOOLS[key];
+                  return (
+                    <a key={tool.href} href={tool.href}
+                      onClick={() => setMoreMenu(false)}
+                      style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "10px" }}
+                      className={`hover:bg-white/5 transition-colors ${isActive(tool.key) ? "bg-white/5" : ""}`}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                        background: `${tool.color}22`,
+                        border: `1px solid ${tool.color}44`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "14px",
+                      }}>
+                        {tool.icon}
+                      </div>
+                      <div>
+                        <p style={{ fontSize: "12px", fontWeight: 600, color: "#f0f4ff", margin: 0 }}>{tool.label}</p>
+                        <p style={{ fontSize: "11px", color: "#6b7280", margin: 0 }}>{tool.short}</p>
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -267,69 +266,48 @@ export default function Header({
           </div>
 
           <nav className="px-4 py-6 space-y-6">
-            {/* Track section */}
-            <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 px-2">Track</p>
-              {[
-                { href: "/", key: "home" as ActiveNav, icon: "⏱", label: "Processing Times", sub: "Visa wait times by country" },
-                { href: "/draws", key: "draws" as ActiveNav, icon: "🗳", label: "PR Draws", sub: "Express Entry & Provincial" },
-                { href: "/tracker", key: "tracker" as ActiveNav, icon: "⏰", label: "Permit Expiry Tracker", sub: "Never miss your renewal" },
-              ].map(item => (
-                <a key={item.href} href={item.href}
-                  onClick={() => setMobileMenu(false)}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${isActive(item.key) ? "bg-red-900/20 border border-red-500/30" : "hover:bg-white/5"}`}
-                  style={{ textDecoration: "none" }}>
-                  <span className="text-lg">{item.icon}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-white">{item.label}</p>
-                    <p className="text-xs text-gray-500">{item.sub}</p>
-                  </div>
-                </a>
-              ))}
-            </div>
+            {MOBILE_GROUPS.map((section) => (
+              <div key={section.title}>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 px-2">{section.title}</p>
+                {section.keys.map((key) => {
+                  const item = TOOLS[key];
+                  return (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenu(false)}
+                      className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${
+                        isActive(item.key) ? "bg-red-900/20 border border-red-500/30" : "hover:bg-white/5"
+                      }`}
+                      style={{ textDecoration: "none" }}
+                    >
+                      <span className="text-lg">{item.icon}</span>
+                      <div>
+                        <p className="text-sm font-semibold text-white">{item.label}</p>
+                        <p className="text-xs text-gray-500">{item.short}</p>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            ))}
 
-            {/* Calculate section */}
-            <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 px-2">Calculate</p>
-              {[
-                { href: "/crs", key: "crs" as ActiveNav, icon: "🧮", label: "CRS Calculator", sub: "Calculate your score" },
-                { href: "/clb", key: "clb" as ActiveNav, icon: "🔤", label: "CLB Converter", sub: "IELTS / CELPIP → CLB" },
-                { href: "/funds", key: "funds" as ActiveNav, icon: "💰", label: "Proof of Funds", sub: "How much money you need" },
-                { href: "/noc", key: "noc" as ActiveNav, icon: "🔍", label: "NOC Code Finder", sub: "Find your NOC 2021 code" },
-              ].map(item => (
-                <a key={item.href} href={item.href}
-                  onClick={() => setMobileMenu(false)}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${isActive(item.key) ? "bg-red-900/20 border border-red-500/30" : "hover:bg-white/5"}`}
-                  style={{ textDecoration: "none" }}>
-                  <span className="text-lg">{item.icon}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-white">{item.label}</p>
-                    <p className="text-xs text-gray-500">{item.sub}</p>
-                  </div>
-                </a>
-              ))}
-            </div>
-
-            {/* Plan section */}
-            <div>
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-2 px-2">Plan</p>
-              {[
-                { href: "/pathway", key: "pathway" as ActiveNav, icon: "🗺️", label: "PR Pathway Finder", sub: "Which stream fits you?" },
-                { href: "/pnp", key: "pnp" as ActiveNav, icon: "🏛️", label: "PNP Tracker", sub: "Ontario, BC & Alberta streams" },
-                { href: "/checklist", key: "checklist" as ActiveNav, icon: "📋", label: "Document Checklist", sub: "Know what documents you need" },
-                { href: "/dashboard", key: "dashboard" as ActiveNav, icon: "📊", label: "My Dashboard", sub: "Your PR eligibility" },
-              ].map(item => (
-                <a key={item.href} href={item.href}
-                  onClick={() => setMobileMenu(false)}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${isActive(item.key) ? "bg-red-900/20 border border-red-500/30" : "hover:bg-white/5"}`}
-                  style={{ textDecoration: "none" }}>
-                  <span className="text-lg">{item.icon}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-white">{item.label}</p>
-                    <p className="text-xs text-gray-500">{item.sub}</p>
-                  </div>
-                </a>
-              ))}
+            {/* About + account */}
+            <div className="border-t border-white/10 pt-4">
+              <a
+                href={TOOLS.about.href}
+                onClick={() => setMobileMenu(false)}
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${
+                  isActive("about") ? "bg-red-900/20 border border-red-500/30" : "hover:bg-white/5"
+                }`}
+                style={{ textDecoration: "none" }}
+              >
+                <span className="text-lg">{TOOLS.about.icon}</span>
+                <div>
+                  <p className="text-sm font-semibold text-white">{TOOLS.about.label}</p>
+                  <p className="text-xs text-gray-500">{TOOLS.about.short}</p>
+                </div>
+              </a>
             </div>
 
             {/* Account section */}
