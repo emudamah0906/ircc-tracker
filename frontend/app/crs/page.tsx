@@ -533,10 +533,10 @@ export default function CRSCalculatorPage() {
   const pointsNeeded = Math.max(0, latestCutoff - total);
   const scoreColor =
     total >= 470
-      ? { ring: "ring-green-500", text: "text-green-400", badge: "bg-green-900/40 text-green-300 border-green-700" }
+      ? { ring: "ring-green-500", text: "text-green-400", badge: "bg-green-900/40 text-green-300 border-green-700", fab: "bg-green-600 hover:bg-green-500" }
       : total >= 400
-      ? { ring: "ring-yellow-500", text: "text-yellow-400", badge: "bg-yellow-900/40 text-yellow-300 border-yellow-700" }
-      : { ring: "ring-red-500", text: "text-red-400", badge: "bg-red-900/40 text-red-300 border-red-700" };
+      ? { ring: "ring-yellow-500", text: "text-yellow-400", badge: "bg-yellow-900/40 text-yellow-300 border-yellow-700", fab: "bg-yellow-600 hover:bg-yellow-500" }
+      : { ring: "ring-red-500", text: "text-red-400", badge: "bg-red-900/40 text-red-300 border-red-700", fab: "bg-red-600 hover:bg-red-500" };
 
   function set<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -884,7 +884,7 @@ export default function CRSCalculatorPage() {
           </div>
 
           {/* ── Right: Score Panel ── */}
-          <div className="space-y-4">
+          <div id="crs-score-panel" className="space-y-4 scroll-mt-24">
             <div className="lg:sticky lg:top-24 space-y-4">
 
               {/* Main Score Card */}
@@ -1124,6 +1124,25 @@ export default function CRSCalculatorPage() {
           <span className="text-gray-400 text-sm whitespace-nowrap">Find Pathways →</span>
         </a>
       </div>
+
+      {/* Floating mobile-only score pill — gives instant feedback while filling the form */}
+      <button
+        onClick={() => {
+          document.getElementById("crs-score-panel")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }}
+        aria-label={`Your CRS score is ${total}. Tap for full breakdown.`}
+        className={`lg:hidden fixed bottom-5 right-5 z-50 flex items-center gap-3 pl-5 pr-4 py-3 rounded-full text-white shadow-2xl transition-colors ${scoreColor.fab}`}
+        style={{ boxShadow: "0 12px 32px rgba(0,0,0,0.4)" }}
+      >
+        <span className="text-[10px] uppercase tracking-widest opacity-85 leading-none">
+          Your CRS
+        </span>
+        <span className="text-2xl font-black tabular-nums leading-none">{total}</span>
+        <span className="text-base leading-none">↑</span>
+      </button>
     </PageLayout>
   );
 }
