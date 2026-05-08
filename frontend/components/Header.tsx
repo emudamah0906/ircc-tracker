@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
-type ActiveNav = "home" | "draws" | "crs" | "pathway" | "tracker" | "funds" | "dashboard" | "pricing" | "processing" | "clb" | "noc" | "checklist" | "pnp" | "news";
+type ActiveNav = "home" | "draws" | "crs" | "pathway" | "tracker" | "funds" | "dashboard" | "pricing" | "processing" | "clb" | "noc" | "checklist" | "pnp" | "news" | "about";
 
 const NAV_ITEMS = [
   { href: "/", key: "home" as ActiveNav, label: "Processing Times", icon: "⏱" },
@@ -21,6 +21,7 @@ const MORE_TOOLS = [
   { href: "/noc", key: "noc" as ActiveNav, icon: "🔍", label: "NOC Code Finder", sub: "Find your NOC 2021 code", color: "#ec4899" },
   { href: "/checklist", key: "checklist" as ActiveNav, icon: "📋", label: "Document Checklist", sub: "Know what documents you need", color: "#14b8a6" },
   { href: "/dashboard", key: "dashboard" as ActiveNav, icon: "📊", label: "My Dashboard", sub: "Your PR eligibility", color: "#8b5cf6" },
+  { href: "/about", key: "about" as ActiveNav, icon: "🍁", label: "About IRCC Tracker", sub: "Why we built this", color: "#d52b1e" },
 ];
 
 export default function Header({
