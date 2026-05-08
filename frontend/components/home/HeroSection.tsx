@@ -30,28 +30,8 @@ export default function HeroSection({
         <span style={{ color: "#d52b1e" }}>Command Centre</span>
       </h1>
       <p className="text-gray-400 text-base sm:text-lg max-w-2xl mx-auto mb-7">
-        CRS calculator, processing times, draw history, and 10 free tools — all in one place. No lawyer needed to get started.
+        CRS calculator, processing times, draw history, and free immigration tools — all in one place. No lawyer needed to get started.
       </p>
-
-      {/* Stats bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-7 max-w-2xl mx-auto">
-        {[
-          { value: "180+", label: "Countries Tracked", color: "#60a5fa", icon: "🌐" },
-          { value: "10", label: "Free Tools", color: "#4ade80", icon: "🛠" },
-          { value: "Daily", label: "Data Updates", color: "#facc15", icon: "⚡" },
-          { value: "Free", label: "No Credit Card", color: "#f472b6", icon: "🔓" },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl p-3 text-center" style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            backdropFilter: "blur(8px)",
-          }}>
-            <div className="text-lg mb-0.5">{s.icon}</div>
-            <p className="text-lg font-bold leading-none" style={{ color: s.color }}>{s.value}</p>
-            <p className="text-xs text-gray-500 mt-1">{s.label}</p>
-          </div>
-        ))}
-      </div>
 
       {/* CTAs */}
       <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
