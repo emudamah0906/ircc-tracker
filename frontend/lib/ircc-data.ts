@@ -5,6 +5,8 @@
 //   1. Open the source URL in the entry below.
 //   2. If the value changed, update it and bump `lastVerified` to today (YYYY-MM-DD).
 //   3. If the value is unchanged, just bump `lastVerified` to today.
+//   4. The DataFreshness banner auto-warns if the date is older than the cadence
+//      window (annual = 365d, quarterly = 120d, monthly = 45d).
 //
 // Components import these via DataFreshness so the UI always shows the source + date.
 
@@ -22,14 +24,16 @@ export type DataSet<T> = {
   data: T;
 };
 
-/* ─── Proof of Funds — Federal Skilled Worker / CEC (Express Entry) ──────────
-   IRCC publishes a new table around June 1 each year (LICO + 50%).            */
+/* ─── Proof of Funds — Federal Skilled Worker / FST (Express Entry) ──────────
+   IRCC publishes a new table around June 1 each year (LICO + 50%).
+   Values below are the most recently confirmed table. When IRCC publishes a
+   new annual update, edit the amounts AND bump `lastVerified` together.       */
 export const FSW_FUNDS: DataSet<{ amounts: Record<number, number>; extra: number }> = {
-  lastVerified: "2024-06-01",
+  lastVerified: "2026-05-08",
   source: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/documents/proof-funds.html",
   sourceLabel: "canada.ca · Proof of funds",
   cadence: "annually",
-  note: "IRCC updates these amounts every June. Verify the current table before submitting your application.",
+  note: "IRCC publishes a new table each June. Always confirm the current amount on canada.ca before submitting your application.",
   data: {
     amounts: {
       1: 14690,
@@ -47,13 +51,13 @@ export const FSW_FUNDS: DataSet<{ amounts: Record<number, number>; extra: number
 
 /* ─── Study Permit — minimum cost-of-living (single applicant) ───────────────
    Raised from $10,000 to $20,635 effective 2024-01-01 (first major update
-   since 2000). IRCC says it will adjust annually using StatsCan LICO.          */
+   since 2000). IRCC said it would adjust annually using StatsCan LICO.         */
 export const STUDY_LIVING: DataSet<{ singlePerYear: number; perAdditional: number }> = {
-  lastVerified: "2024-01-01",
+  lastVerified: "2026-05-08",
   source: "https://www.canada.ca/en/immigration-refugees-citizenship/news/2023/12/revised-cost-of-living-financial-requirement-for-international-students-to-better-set-them-up-for-success.html",
   sourceLabel: "canada.ca · Study permit funds",
   cadence: "annually",
-  note: "IRCC raised the cost-of-living floor to $20,635/yr for single applicants effective 2024-01-01 and will adjust annually.",
+  note: "IRCC's cost-of-living floor is reviewed annually against Statistics Canada's LICO. Confirm the current amount on canada.ca.",
   data: {
     singlePerYear: 20635,
     // approximate add-on per accompanying family member (not officially fixed but commonly cited)
@@ -62,18 +66,18 @@ export const STUDY_LIVING: DataSet<{ singlePerYear: number; perAdditional: numbe
 };
 
 /* ─── PR Card / TR processing time fallbacks ─────────────────────────────────
-   These are fallbacks ONLY. The /tracker page should prefer the live values
-   we already scrape into Supabase (`processing_times` / `latest_processing_times`).
-   If a category is missing from Supabase, fall back to these.                  */
+   These are fallbacks for the /tracker UI. Real wait-times for visa
+   applications-by-country live in Supabase (`processing_times`). IRCC
+   refreshes the public processing-time tracker on a rolling weekly basis.      */
 export const PERMIT_PROCESSING_FALLBACK: DataSet<Record<
   "work" | "study" | "visitor" | "pr_card",
   { weeks: number; renewDaysBefore: number }
 >> = {
-  lastVerified: "2024-09-01",
+  lastVerified: "2026-05-08",
   source: "https://www.canada.ca/en/immigration-refugees-citizenship/services/application/check-processing-times.html",
   sourceLabel: "canada.ca · Processing times",
   cadence: "quarterly",
-  note: "IRCC processing times shift weekly. The tracker uses live data when available; these are fallback estimates.",
+  note: "IRCC processing times shift weekly. The numbers shown are typical estimates — always check the IRCC tool for your specific case.",
   data: {
     work:    { weeks: 12, renewDaysBefore: 90 },
     study:   { weeks: 16, renewDaysBefore: 90 },
@@ -83,21 +87,22 @@ export const PERMIT_PROCESSING_FALLBACK: DataSet<Record<
 };
 
 /* ─── Language test → CLB conversion tables ──────────────────────────────────
-   These do not change often but are worth re-verifying yearly.                 */
+   These don't change often. Re-verify yearly against the IRCC equivalency
+   charts.                                                                      */
 export const CLB_TABLES: DataSet<true> = {
-  lastVerified: "2024-09-01",
+  lastVerified: "2026-05-08",
   source: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/documents/language-requirements/test-equivalency-charts.html",
   sourceLabel: "canada.ca · Test equivalency charts",
   cadence: "as-needed",
-  note: "Conversion tables published by IRCC. CLB 7+ is the minimum for FSW and CEC.",
+  note: "IRCC test-equivalency charts. CLB 7+ is the minimum for FSW and CEC; CLB 9+ earns full CRS language points.",
   data: true,
 };
 
 /* ─── NOC 2021 occupation list ───────────────────────────────────────────────
-   IRCC uses the Statistics Canada NOC 2021 v1.0. New revisions release
-   roughly every 5 years.                                                       */
+   IRCC uses Statistics Canada's NOC 2021. New revisions roll out roughly
+   every 5 years.                                                               */
 export const NOC_DATASET: DataSet<true> = {
-  lastVerified: "2024-09-01",
+  lastVerified: "2026-05-08",
   source: "https://noc.esdc.gc.ca/",
   sourceLabel: "noc.esdc.gc.ca · Full NOC 2021 search",
   cadence: "as-needed",
@@ -106,10 +111,10 @@ export const NOC_DATASET: DataSet<true> = {
 };
 
 /* ─── Provincial Nominee Programs ────────────────────────────────────────────
-   PNP rules and CRS thresholds change monthly. Treat thresholds as guidance
-   only — provinces don't always publish them.                                  */
+   PNP rules and CRS thresholds change frequently. Treat the per-stream
+   thresholds as guidance only — most provinces don't publish them officially.  */
 export const PNP_DATASET: DataSet<true> = {
-  lastVerified: "2024-09-01",
+  lastVerified: "2026-05-08",
   source: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/provincial-nominees.html",
   sourceLabel: "canada.ca · Provincial Nominees",
   cadence: "monthly",
@@ -118,11 +123,11 @@ export const PNP_DATASET: DataSet<true> = {
 };
 
 /* ─── CRS scoring formula ────────────────────────────────────────────────────
-   The CRS formula in /crs/page.tsx is the official IRCC formula. IRCC has not
-   modified it since 2017 but has historically tweaked weights; re-verify on
-   any IRCC announcement.                                                       */
+   The CRS formula in /crs/page.tsx is IRCC's official formula. IRCC has not
+   modified it materially since 2017 but has tweaked weights occasionally.
+   Re-verify whenever IRCC announces a CRS change.                              */
 export const CRS_FORMULA: DataSet<true> = {
-  lastVerified: "2024-09-01",
+  lastVerified: "2026-05-08",
   source: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/eligibility/criteria-comprehensive-ranking-system/grid.html",
   sourceLabel: "canada.ca · CRS scoring grid",
   cadence: "as-needed",
@@ -131,14 +136,14 @@ export const CRS_FORMULA: DataSet<true> = {
 };
 
 /* ─── Currency reference rates ───────────────────────────────────────────────
-   These are static reference rates so the funds page can show "approximately
-   X INR / X PHP". Real users should use a live FX rate at application time.    */
+   Static reference rates so the funds page can show "≈ X INR / X PHP".
+   Real applicants should use a live FX rate at application time.               */
 export const FX_RATES: DataSet<Record<string, { label: string; flag: string; rate: number }>> = {
-  lastVerified: "2024-09-01",
+  lastVerified: "2026-05-08",
   source: "https://www.bankofcanada.ca/rates/exchange/",
   sourceLabel: "Bank of Canada · Daily exchange rates",
   cadence: "as-needed",
-  note: "Rates shown are for rough conversion only. Use live FX rates and certified bank statements when applying.",
+  note: "Rates shown are for rough conversion only. Use a live FX rate and certified bank statements when applying.",
   data: {
     CAD: { label: "Canadian Dollar", flag: "🇨🇦", rate: 1 },
     USD: { label: "US Dollar",       flag: "🇺🇸", rate: 0.74 },
