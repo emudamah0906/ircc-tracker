@@ -1,7 +1,7 @@
 "use client";
 
 const TOOL_LINKS = [
-  { href: "/", label: "Processing Times" },
+  { href: "/processing", label: "Processing Times" },
   { href: "/draws", label: "PR Draws" },
   { href: "/crs", label: "CRS Calculator" },
   { href: "/clb", label: "CLB Converter" },

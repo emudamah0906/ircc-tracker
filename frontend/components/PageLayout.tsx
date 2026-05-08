@@ -6,7 +6,6 @@ import JourneyProgress from "@/components/JourneyProgress";
 
 // Map activeNav values to journey slugs
 const NAV_TO_SLUG: Record<string, string> = {
-  home: "processing",
   processing: "processing",
   draws: "draws",
   crs: "crs",

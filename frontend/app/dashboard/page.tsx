@@ -522,7 +522,7 @@ export default function Dashboard() {
               <a href="/crs" className="flex items-center justify-between text-xs text-gray-400 hover:text-white py-1.5 border-b border-white/5">
                 <span>🧮 Detailed CRS Calculator</span><span>→</span>
               </a>
-              <a href="/" className="flex items-center justify-between text-xs text-gray-400 hover:text-white py-1.5">
+              <a href="/processing" className="flex items-center justify-between text-xs text-gray-400 hover:text-white py-1.5">
                 <span>⏱ Check processing times</span><span>→</span>
               </a>
             </div>

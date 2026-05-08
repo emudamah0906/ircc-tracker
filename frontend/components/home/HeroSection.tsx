@@ -1,13 +1,12 @@
 "use client";
 
-export default function HeroSection({
-  onScrollToProcessing,
-}: {
-  onScrollToProcessing: () => void;
-}) {
+// Slim hero — one tagline, one primary CTA, one secondary CTA.
+// The 4 main paths live in ChooseYourPath right below; the full tool
+// list lives in ToolsByGroup. Hero is just the brand statement.
+
+export default function HeroSection() {
   return (
     <section className="canada-hero rounded-2xl" style={{ paddingBottom: 40 }}>
-
       {/* Live badge */}
       <div className="flex justify-center mb-4">
         <span style={{
@@ -33,8 +32,7 @@ export default function HeroSection({
         CRS calculator, processing times, draw history, and free immigration tools — all in one place. No lawyer needed to get started.
       </p>
 
-      {/* CTAs */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <a
           href="/pathway"
           className="canada-btn px-6 py-3 text-sm text-center"
@@ -42,32 +40,13 @@ export default function HeroSection({
         >
           Find My PR Pathway →
         </a>
-        <button
-          onClick={onScrollToProcessing}
-          className="canada-pill px-6 py-3 text-sm"
+        <a
+          href="/processing"
+          className="canada-pill px-6 py-3 text-sm text-center"
+          style={{ textDecoration: "none" }}
         >
           Check Processing Times
-        </button>
-      </div>
-
-      {/* Tool quick-links */}
-      <div className="flex flex-wrap justify-center gap-2 max-w-xl mx-auto">
-        {[
-          { href: "/crs", label: "CRS Calculator", color: "#8b5cf6" },
-          { href: "/clb", label: "CLB Converter", color: "#06b6d4" },
-          { href: "/draws", label: "PR Draws", color: "#d52b1e" },
-          { href: "/funds", label: "Proof of Funds", color: "#eab308" },
-          { href: "/checklist", label: "Document Checklist", color: "#14b8a6" },
-        ].map(({ href, label, color }) => (
-          <a key={href} href={href} style={{
-            textDecoration: "none", fontSize: 11, fontWeight: 500,
-            padding: "4px 12px", borderRadius: 999,
-            background: `${color}18`, border: `1px solid ${color}33`, color,
-            transition: "all 0.2s",
-          }}>
-            {label}
-          </a>
-        ))}
+        </a>
       </div>
     </section>
   );

@@ -560,7 +560,7 @@ export default function PathwayPage() {
                 </div>
                 <span className="text-gray-400 text-xs">→</span>
               </a>
-              <a href="/" className="canada-next-step" style={{ textDecoration: "none" }}>
+              <a href="/processing" className="canada-next-step" style={{ textDecoration: "none" }}>
                 <span className="text-xl">⏱</span>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-white">Check processing times</p>
