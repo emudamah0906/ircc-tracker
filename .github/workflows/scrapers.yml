@@ -48,3 +48,24 @@ jobs:
         run: python scraper.py
         # Don't fail the whole workflow if one scraper hiccups.
         continue-on-error: true
+
+      - name: Fetch IRCC news (invokes Supabase Edge Function)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          echo "Invoking fetch-ircc-news edge function..."
+          status_and_body=$(curl -s -w "\nHTTP_STATUS:%{http_code}\n" \
+            -X POST \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "${SUPABASE_URL}/functions/v1/fetch-ircc-news")
+          echo "$status_and_body"
+          # Fail the step if the HTTP status wasn't 2xx
+          status=$(echo "$status_and_body" | grep -oE 'HTTP_STATUS:[0-9]+' | tail -1 | cut -d: -f2)
+          if [ -z "$status" ] || [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "News fetch failed with status: $status"
+            exit 1
+          fi
+        continue-on-error: true
