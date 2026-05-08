@@ -216,6 +216,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [latestCutoff, setLatestCutoff] = useState(477);
+  const [latestDrawDate, setLatestDrawDate] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -229,9 +230,12 @@ export default function Dashboard() {
       if (existing) setProfile({ ...DEFAULT_PROFILE, ...existing });
       setLoadingProfile(false);
     });
-    supabase.from("pr_draws").select("crs_score").is("province", null)
+    supabase.from("pr_draws").select("crs_score, draw_date").is("province", null)
       .order("draw_date", { ascending: false }).limit(1)
-      .then(({ data }) => { if (data?.[0]?.crs_score) setLatestCutoff(data[0].crs_score); });
+      .then(({ data }) => {
+        if (data?.[0]?.crs_score) setLatestCutoff(data[0].crs_score);
+        if (data?.[0]?.draw_date) setLatestDrawDate(data[0].draw_date);
+      });
   }, [router]);
 
   const { total: crsScore, breakdown } = useMemo(() => calcCRS(profile), [profile]);
@@ -481,8 +485,15 @@ export default function Dashboard() {
                   <span className="text-gray-300 font-semibold">Total</span>
                   <span className="font-bold" style={{ color: scoreColor }}>{crsScore}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Latest cut-off</span>
+                <div className="flex justify-between items-baseline">
+                  <span className="text-gray-400">
+                    Latest cut-off
+                    {latestDrawDate && (
+                      <span className="text-[10px] text-gray-600 ml-1">
+                        · {new Date(latestDrawDate).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}
+                      </span>
+                    )}
+                  </span>
                   <span className="text-yellow-400 font-bold">{latestCutoff}</span>
                 </div>
               </div>
@@ -500,6 +511,16 @@ export default function Dashboard() {
                   You need <span className="text-white font-semibold">{gap} more points</span> to reach the latest cut-off of <span className="text-yellow-400 font-semibold">{latestCutoff}</span>.
                 </p>
               )}
+              {latestDrawDate && (() => {
+                const days = Math.floor((Date.now() - new Date(latestDrawDate).getTime()) / 86_400_000);
+                if (days <= 30) return null;
+                return (
+                  <p className="text-[11px] text-yellow-400 mt-2 leading-relaxed">
+                    ⚠ The latest draw on file is {days} days old. IRCC may have published newer draws —{" "}
+                    <a href="/draws" className="underline hover:text-yellow-300">check /draws</a> for the latest cut-off.
+                  </p>
+                );
+              })()}
             </div>
 
             {/* Tips */}
@@ -526,6 +547,10 @@ export default function Dashboard() {
                 <span>⏱ Check processing times</span><span>→</span>
               </a>
             </div>
+
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              This dashboard is a self-assessment based on IRCC&apos;s published CRS formula — not legal advice or an IRCC determination. Only IRCC&apos;s official assessment confirms your eligibility. Your saved profile is private to your account.
+            </p>
           </div>
         </div>
       </div>

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import PageLayout from "@/components/PageLayout";
+import DataFreshness from "@/components/DataFreshness";
+import { PATHWAY_DESCRIPTIONS } from "@/lib/ircc-data";
 
 type Answers = {
   location: "inside" | "outside" | "";
@@ -24,7 +26,10 @@ type Pathway = {
   description: string;
   requirements: string[];
   nextStep: string;
+  /** Internal link (e.g. to /crs or /pnp) */
   link?: string;
+  /** Official IRCC page for this program */
+  irccUrl?: string;
 };
 
 const DEFAULT: Answers = {
@@ -96,6 +101,7 @@ function getPathways(a: Answers): Pathway[] {
       ],
       nextStep: "Create an Express Entry profile and enter the CEC pool. Draws happen every 2 weeks.",
       link: "/crs",
+      irccUrl: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/eligibility/canadian-experience-class.html",
     });
   }
 
@@ -122,6 +128,7 @@ function getPathways(a: Answers): Pathway[] {
         ? "Get your ECA done, take IELTS/CELPIP, then create an Express Entry FSW profile."
         : "Focus on improving language scores (worth up to 28 pts) or gaining more work experience to reach 67 points.",
       link: "/crs",
+      irccUrl: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/eligibility/federal-skilled-workers.html",
     });
   }
 
@@ -138,6 +145,7 @@ function getPathways(a: Answers): Pathway[] {
         "CLB 5 for speaking/listening, CLB 4 for reading/writing",
       ],
       nextStep: "Apply through Express Entry Federal Skilled Trades category.",
+      irccUrl: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/eligibility/federal-skilled-trades.html",
     });
   }
 
@@ -146,32 +154,37 @@ function getPathways(a: Answers): Pathway[] {
     name: "Provincial Nominee Program (PNP)",
     icon: "🏛️",
     match: a.province && a.province !== "undecided" ? "strong" : "possible",
-    description: "Each province has its own streams. Often easier than federal Express Entry, especially for people with provincial ties.",
+    description: "Each province runs its own streams with different point systems and processing times. Often a faster route than federal Express Entry if you have ties to a specific province.",
     requirements: [
-      "Ties to a specific province (job offer, education, work experience there)",
-      "Meet that province's specific stream requirements",
-      "Some PNP streams are Express Entry-linked (adds 600 pts to CRS)",
+      "Ties to a specific province (job offer, education, or work experience there)",
+      "Meet that province's stream-specific requirements",
+      "Enhanced (Express Entry-linked) PNP streams add 600 CRS points",
     ],
     nextStep: a.province && a.province !== "undecided"
-      ? `Check the ${a.province} provincial immigration website for available streams.`
-      : "Decide which province you want to live in, then check their PNP streams.",
-    link: "/draws",
+      ? `Open the PNP Tracker to compare ${a.province} streams, eligibility, and typical CRS thresholds.`
+      : "Decide which province you want to settle in, then explore their streams in our PNP Tracker.",
+    link: "/pnp",
+    irccUrl: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/provincial-nominees.html",
   });
 
-  // Atlantic Immigration Program
-  if (["Nova Scotia", "New Brunswick", "Prince Edward Island", "Newfoundland"].includes(a.province) || a.province === "") {
+  // Atlantic Immigration Program — only show if the user actually picked an
+  // Atlantic province. Previously we showed it on an empty province too,
+  // which surfaced AIP for users it didn't apply to.
+  if (["Nova Scotia", "New Brunswick", "Prince Edward Island", "Newfoundland"].includes(a.province)) {
     pathways.push({
       name: "Atlantic Immigration Program (AIP)",
       icon: "🌊",
-      match: ["Nova Scotia", "New Brunswick", "Prince Edward Island", "Newfoundland"].includes(a.province) ? "strong" : "possible",
-      description: "Faster path to PR for people with a job offer in Atlantic Canada.",
+      match: "strong",
+      description: "Permanent program for skilled workers and international graduates with a job offer from a designated Atlantic Canada employer.",
       requirements: [
-        "Job offer from a designated Atlantic employer",
-        "Post-secondary education (or equivalent)",
-        "Language: CLB 4 minimum",
-        "Settlement funds",
+        "Job offer from a designated Atlantic Canada employer (NS, NB, PE, or NL)",
+        "Skilled-worker stream: 1+ year of qualifying work experience in last 5 years (or international graduate stream)",
+        "Education at high-school level or higher",
+        "CLB 4 minimum language proficiency",
+        "Settlement funds (unless already living and working in Canada)",
       ],
-      nextStep: "Find a designated Atlantic employer willing to hire you, then apply.",
+      nextStep: "Search the designated-employer list for your Atlantic province and apply for a job offer first — AIP requires an employer endorsement.",
+      irccUrl: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/atlantic-immigration.html",
     });
   }
 
@@ -188,6 +201,7 @@ function getPathways(a: Answers): Pathway[] {
         "You must be legally married or in a common-law/conjugal relationship",
       ],
       nextStep: "Your spouse applies to sponsor you. Processing takes 12–24 months (faster if spouse is Canadian citizen).",
+      irccUrl: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/family-sponsorship/sponsor-spouse.html",
     });
   }
 
@@ -205,21 +219,23 @@ function getPathways(a: Answers): Pathway[] {
         "Then apply through Canadian Experience Class",
       ],
       nextStep: "Apply for your PGWP before your study permit expires. Then start working toward CEC eligibility.",
+      irccUrl: "https://www.canada.ca/en/immigration-refugees-citizenship/services/work-canada/permit/post-graduation-work-permit-program.html",
     });
   }
 
-  // Rural and Northern Immigration Pilot
+  // Rural Community Immigration Class
   pathways.push({
-    name: "Rural & Northern Immigration Pilot",
+    name: "Rural Community Immigration Class",
     icon: "🌲",
     match: a.hasJobOffer === "yes" ? "possible" : "unlikely",
-    description: "For smaller communities outside major cities. Less competition, but requires job offer in participating community.",
+    description: "Permanent program (replaced the RNIP pilot) for smaller participating communities. Less competition than Express Entry, but requires a job offer in a designated community.",
     requirements: [
-      "Job offer from employer in a participating rural community",
-      "Meet community-specific requirements",
+      "Job offer from a designated employer in a participating rural community",
+      "Community-specific endorsement",
       "Intention to live in that community",
     ],
-    nextStep: "Check if your employer's community participates in RNIP.",
+    nextStep: "Confirm your prospective community is on the participating list, then apply through the community's process.",
+    irccUrl: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/rural-community-immigration-class.html",
   });
 
   // Sort: strong first, then possible, then unlikely
@@ -512,11 +528,19 @@ export default function PathwayPage() {
                       <span className="text-white font-semibold">Next step: </span>{p.nextStep}
                     </div>
 
-                    {p.link && (
-                      <a href={p.link} className="mt-3 inline-block text-xs text-red-400 hover:text-red-300">
-                        Check your eligibility →
-                      </a>
-                    )}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
+                      {p.link && (
+                        <a href={p.link} className="text-xs text-red-400 hover:text-red-300">
+                          Check your eligibility →
+                        </a>
+                      )}
+                      {p.irccUrl && (
+                        <a href={p.irccUrl} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-blue-400 hover:text-blue-300">
+                          Read on canada.ca →
+                        </a>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -577,6 +601,18 @@ export default function PathwayPage() {
                 <span className="text-gray-400 text-xs">→</span>
               </a>
             </div>
+
+            <p className="text-[11px] text-gray-500 mt-6 leading-relaxed text-center">
+              This is a guide based on IRCC program eligibility criteria — not legal advice. Only IRCC&apos;s decision determines your actual eligibility.
+            </p>
+
+            <DataFreshness
+              lastVerified={PATHWAY_DESCRIPTIONS.lastVerified}
+              source={PATHWAY_DESCRIPTIONS.source}
+              sourceLabel={PATHWAY_DESCRIPTIONS.sourceLabel}
+              cadence={PATHWAY_DESCRIPTIONS.cadence}
+              note={PATHWAY_DESCRIPTIONS.note}
+            />
           </>
         )}
       </div>

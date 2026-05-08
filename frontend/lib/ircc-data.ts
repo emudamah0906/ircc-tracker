@@ -135,6 +135,31 @@ export const CRS_FORMULA: DataSet<true> = {
   data: true,
 };
 
+/* ─── Document checklists (used by /checklist) ──────────────────────────────
+   Document requirements come from IRCC's per-stream application guides.
+   Re-verify whenever IRCC publishes a new application guide PDF.              */
+export const CHECKLIST_DATASET: DataSet<true> = {
+  lastVerified: "2026-05-08",
+  source: "https://www.canada.ca/en/immigration-refugees-citizenship/services/application/application-forms-guides.html",
+  sourceLabel: "canada.ca · IRCC application guides",
+  cadence: "as-needed",
+  note: "Document requirements come from IRCC's official application guides. Always cross-check the current guide for your specific stream before submitting.",
+  data: true,
+};
+
+/* ─── Immigration pathway descriptions (used by /pathway) ───────────────────
+   Eligibility blurbs for FSW, CEC, FST, PNP, AIP, spousal sponsorship, etc.
+   These are summaries of IRCC program pages — re-verify whenever a program
+   gets renamed, merged, or replaced (e.g. RNIP → Rural Community Class).      */
+export const PATHWAY_DESCRIPTIONS: DataSet<true> = {
+  lastVerified: "2026-05-08",
+  source: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada.html",
+  sourceLabel: "canada.ca · Immigrate to Canada",
+  cadence: "as-needed",
+  note: "Each result card links to the official IRCC program page for the authoritative requirements.",
+  data: true,
+};
+
 /* ─── Currency reference rates ───────────────────────────────────────────────
    Static reference rates so the funds page can show "≈ X INR / X PHP".
    Real applicants should use a live FX rate at application time.               */

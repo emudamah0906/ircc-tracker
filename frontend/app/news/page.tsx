@@ -84,23 +84,43 @@ export default function NewsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const newest = news[0];
+
   return (
     <PageLayout subtitle="IRCC News & Updates" activeNav="news">
       <div>
         <h1 className="text-2xl font-bold">📰 IRCC News</h1>
         <p className="text-gray-400 text-sm mt-1">
-          Latest immigration updates, program changes, and announcements from IRCC
+          Aggregated automatically from{" "}
+          <a
+            href="https://www.canada.ca/en/immigration-refugees-citizenship/news.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 underline"
+          >
+            canada.ca · IRCC newsroom
+          </a>{" "}
+          — not editorial commentary.
         </p>
       </div>
 
       {/* Live indicator + search */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        {lastRefresh && (
-          <span className="text-xs text-gray-500 flex items-center gap-1.5">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            Live · updated {lastRefresh.toLocaleTimeString("en-CA", { hour: "2-digit", minute: "2-digit" })}
-          </span>
-        )}
+        <span className="text-xs text-gray-500 flex items-center gap-1.5">
+          {lastRefresh ? (
+            <>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Live · last sync {lastRefresh.toLocaleTimeString("en-CA", { hour: "2-digit", minute: "2-digit" })}
+              {newest && (
+                <span className="text-gray-600 ml-1">
+                  · newest article {timeAgo(newest.published_at)}
+                </span>
+              )}
+            </>
+          ) : (
+            "Connecting…"
+          )}
+        </span>
         <span className="text-xs text-gray-500">
           {filtered.length} {filtered.length === 1 ? "article" : "articles"}
         </span>
