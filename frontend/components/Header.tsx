@@ -11,8 +11,7 @@ import {
   type ToolKey,
 } from "@/lib/tools";
 
-// Legacy alias — pages still pass "processing" for the home tab.
-export type ActiveNav = ToolKey | "processing";
+export type ActiveNav = ToolKey;
 
 export default function Header({
   subtitle,
@@ -63,8 +62,7 @@ export default function Header({
   }
 
   const initials = user?.email?.slice(0, 2).toUpperCase() ?? "";
-  const isActive = (key: ToolKey) =>
-    activeNav === key || (activeNav === "processing" && key === "home");
+  const isActive = (key: ToolKey) => activeNav === key;
 
   const moreActive = HEADER_MORE.some((k) => isActive(k));
 

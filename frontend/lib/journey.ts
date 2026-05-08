@@ -36,11 +36,11 @@ export const JOURNEY_STEPS = {
     { slug: "pathway", label: "Pathway Finder", href: "/pathway", icon: "🗺️" },
     { slug: "crs", label: "CRS Calculator", href: "/crs", icon: "🧮" },
     { slug: "draws", label: "PR Draws", href: "/draws", icon: "🗳" },
-    { slug: "processing", label: "Processing Times", href: "/", icon: "⏱" },
+    { slug: "processing", label: "Processing Times", href: "/processing", icon: "⏱" },
   ],
   inside: [
     { slug: "tracker", label: "Permit Tracker", href: "/tracker", icon: "⏰" },
-    { slug: "processing", label: "Processing Times", href: "/", icon: "⏱" },
+    { slug: "processing", label: "Processing Times", href: "/processing", icon: "⏱" },
     { slug: "dashboard", label: "Dashboard", href: "/dashboard", icon: "📊" },
   ],
 };

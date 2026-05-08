@@ -17,7 +17,7 @@ const TOOL_CATEGORIES: { title: string; icon: string; keys: ToolKey[] }[] = [
   {
     title: "Track the system",
     icon: "📊",
-    keys: ["draws", "home", "news", "tracker"],
+    keys: ["draws", "processing", "news", "tracker"],
   },
   {
     title: "Check your eligibility",
@@ -33,7 +33,7 @@ const TOOL_CATEGORIES: { title: string; icon: string; keys: ToolKey[] }[] = [
 
 export default function AboutPage() {
   return (
-    <PageLayout subtitle="Free tools, built by an immigrant" activeNav={"home" as never}>
+    <PageLayout subtitle="Free tools, built by an immigrant" activeNav="about">
       {/* Hero */}
       <section className="text-center py-6">
         <div className="text-5xl mb-2">🍁</div>
@@ -155,7 +155,7 @@ export default function AboutPage() {
         <div className="flex-1">
           <p className="text-sm font-semibold text-white">Ready to start?</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            Check the latest draw or score yourself with the CRS calculator
+            Pick your path on the home page — apply from outside, already in Canada, processing times, or CRS score.
           </p>
         </div>
         <span className="text-gray-400 text-sm whitespace-nowrap">Explore tools →</span>

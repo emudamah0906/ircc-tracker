@@ -3,7 +3,7 @@
 // When adding/renaming a tool, update here only.
 
 export type ToolKey =
-  | "home"
+  | "processing"
   | "draws"
   | "crs"
   | "pathway"
@@ -36,9 +36,9 @@ export type Tool = {
 };
 
 export const TOOLS: Record<ToolKey, Tool> = {
-  home: {
-    key: "home",
-    href: "/",
+  processing: {
+    key: "processing",
+    href: "/processing",
     icon: "⏱",
     label: "Processing Times",
     short: "Visa wait times by country",
@@ -179,7 +179,7 @@ export const TOOLS: Record<ToolKey, Tool> = {
 };
 
 /** Top-level nav items shown in desktop header (in order). */
-export const HEADER_PRIMARY: ToolKey[] = ["home", "draws", "crs"];
+export const HEADER_PRIMARY: ToolKey[] = ["processing", "draws", "crs"];
 
 /** Items in the "More Tools" dropdown (in order). */
 export const HEADER_MORE: ToolKey[] = [
@@ -197,7 +197,7 @@ export const HEADER_MORE: ToolKey[] = [
 
 /** Tools grid shown on homepage and About page (in order). */
 export const ALL_TOOLS: ToolKey[] = [
-  "home",
+  "processing",
   "draws",
   "crs",
   "pathway",
@@ -212,7 +212,7 @@ export const ALL_TOOLS: ToolKey[] = [
 
 /** Mobile menu sections (matches `group` field). */
 export const MOBILE_GROUPS: { title: string; group: ToolGroup; keys: ToolKey[] }[] = [
-  { title: "Track", group: "track", keys: ["home", "draws", "news", "tracker"] },
+  { title: "Track", group: "track", keys: ["processing", "draws", "news", "tracker"] },
   { title: "Calculate", group: "calculate", keys: ["crs", "clb", "funds", "noc"] },
   { title: "Plan", group: "plan", keys: ["pathway", "pnp", "checklist", "dashboard"] },
 ];

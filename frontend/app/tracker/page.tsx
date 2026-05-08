@@ -263,7 +263,7 @@ export default function TrackerPage() {
         {/* Cross-tool suggestions */}
         {expiryDate && (
           <div className="space-y-3">
-            <a href="/" className="canada-next-step" style={{ textDecoration: "none" }}>
+            <a href="/processing" className="canada-next-step" style={{ textDecoration: "none" }}>
               <span className="text-xl">⏱</span>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-white">Check current processing times</p>
