@@ -132,7 +132,7 @@ export const TOOLS: Record<ToolKey, Tool> = {
     icon: "🏛️",
     label: "PNP Tracker",
     short: "Provincial nominee streams",
-    long: "Explore Provincial Nominee Program streams for Ontario, BC, and Alberta — eligibility and typical CRS thresholds.",
+    long: "Explore Provincial Nominee Program streams across all 9 participating provinces — eligibility, requirements, and typical CRS thresholds.",
     color: "#6366f1",
     group: "plan",
   },
