@@ -1,44 +1,51 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import PageLayout from "@/components/PageLayout";
+import DataFreshness from "@/components/DataFreshness";
 import { supabase } from "@/lib/supabase";
+import { PERMIT_PROCESSING_FALLBACK } from "@/lib/ircc-data";
 
 type PermitType = "work" | "study" | "visitor" | "pr_card";
 
-const PERMIT_CONFIG: Record<PermitType, {
+type PermitMeta = {
   label: string; icon: string; color: string;
-  renewDaysBefore: number; processingWeeks: number;
   description: string; tip: string; irccLink: string;
-}> = {
+};
+
+const PERMIT_META: Record<PermitType, PermitMeta> = {
   work: {
     label: "Work Permit", icon: "💼", color: "#3b82f6",
-    renewDaysBefore: 90, processingWeeks: 12,
     description: "You can apply to extend your work permit while in Canada",
     tip: "Apply at least 90 days before expiry. If you apply before it expires, you can continue working under 'maintained status'.",
     irccLink: "https://www.canada.ca/en/immigration-refugees-citizenship/services/work-canada/permit/temporary/extend.html",
   },
   study: {
     label: "Study Permit", icon: "🎓", color: "#8b5cf6",
-    renewDaysBefore: 90, processingWeeks: 16,
     description: "Extend your study permit before starting a new program or to continue studying",
     tip: "Apply before your permit expires. As long as you applied before expiry, you can continue studying under maintained status.",
     irccLink: "https://www.canada.ca/en/immigration-refugees-citizenship/services/study-canada/extend-study-permit.html",
   },
   visitor: {
     label: "Visitor Record / TRV", icon: "🌏", color: "#f59e0b",
-    renewDaysBefore: 30, processingWeeks: 4,
     description: "Extend your stay in Canada as a visitor",
     tip: "Apply before your status expires. Most visitors are given status until their passport expires or 6 months, whichever is sooner.",
     irccLink: "https://www.canada.ca/en/immigration-refugees-citizenship/services/visit-canada/extend-stay.html",
   },
   pr_card: {
     label: "PR Card", icon: "🪪", color: "#10b981",
-    renewDaysBefore: 180, processingWeeks: 60,
     description: "Renew your Permanent Resident card",
-    tip: "PR card renewal takes up to 60 weeks. Apply well before it expires — you need a valid PR card to re-enter Canada by commercial transport.",
+    tip: "PR card renewal can take many months. Apply well before it expires — you need a valid PR card to re-enter Canada by commercial transport.",
     irccLink: "https://www.canada.ca/en/immigration-refugees-citizenship/services/new-immigrants/pr-card/apply-renew-replace.html",
   },
+};
+
+// Merge static metadata with the centralized timing data so weeks are sourced from one place.
+const PERMIT_CONFIG: Record<PermitType, PermitMeta & { renewDaysBefore: number; processingWeeks: number }> = {
+  work:    { ...PERMIT_META.work,    ...PERMIT_PROCESSING_FALLBACK.data.work,    processingWeeks: PERMIT_PROCESSING_FALLBACK.data.work.weeks },
+  study:   { ...PERMIT_META.study,   ...PERMIT_PROCESSING_FALLBACK.data.study,   processingWeeks: PERMIT_PROCESSING_FALLBACK.data.study.weeks },
+  visitor: { ...PERMIT_META.visitor, ...PERMIT_PROCESSING_FALLBACK.data.visitor, processingWeeks: PERMIT_PROCESSING_FALLBACK.data.visitor.weeks },
+  pr_card: { ...PERMIT_META.pr_card, ...PERMIT_PROCESSING_FALLBACK.data.pr_card, processingWeeks: PERMIT_PROCESSING_FALLBACK.data.pr_card.weeks },
 };
 
 function getDaysUntil(dateStr: string): number {
@@ -243,6 +250,15 @@ export default function TrackerPage() {
             ))}
           </div>
         )}
+
+        {/* Source / freshness */}
+        <DataFreshness
+          lastVerified={PERMIT_PROCESSING_FALLBACK.lastVerified}
+          source={PERMIT_PROCESSING_FALLBACK.source}
+          sourceLabel={PERMIT_PROCESSING_FALLBACK.sourceLabel}
+          cadence={PERMIT_PROCESSING_FALLBACK.cadence}
+          note={PERMIT_PROCESSING_FALLBACK.note}
+        />
 
         {/* Cross-tool suggestions */}
         {expiryDate && (

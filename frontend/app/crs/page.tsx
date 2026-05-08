@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import PageLayout from "@/components/PageLayout";
+import DataFreshness from "@/components/DataFreshness";
+import { CRS_FORMULA } from "@/lib/ircc-data";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1105,6 +1107,14 @@ export default function CRSCalculatorPage() {
             No spam. Unsubscribe any time. Not affiliated with IRCC or the Government of Canada.
           </p>
         </div>
+
+        <DataFreshness
+          lastVerified={CRS_FORMULA.lastVerified}
+          source={CRS_FORMULA.source}
+          sourceLabel={CRS_FORMULA.sourceLabel}
+          cadence={CRS_FORMULA.cadence}
+          note={CRS_FORMULA.note}
+        />
 
         {/* Cross-tool suggestions */}
         <a href="/draws" className="canada-next-step" style={{ textDecoration: "none" }}>
