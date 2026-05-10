@@ -19,26 +19,51 @@ import {
   SPOUSE_LANG_SCORES,
   SPOUSE_CANADIAN_WORK_SCORES,
   computeSkillTransferability,
-  getFrenchBonusPoints,
   getJobOfferPoints,
   getCanadianEducationPoints,
+  getFrenchBonusPoints,
+  deriveFrenchBonusTier,
+  rawScoreToClb,
+  TEST_LANGUAGE,
+  TEST_LABEL,
+  TEST_DEFAULTS,
+  TEST_SCORE_OPTIONS,
   type EducationLevel,
   type CLBScores,
   type FrenchBonusTier,
   type JobOfferTier,
   type CanadianEducationTier,
+  type LangTest,
+  type OfficialLanguage,
+  type Skill,
 } from "@/lib/crs";
+
+/**
+ * One language block. Users can either enter raw test scores (we convert to
+ * CLB live) or enter CLB directly if they already know it. `language` tells
+ * the form whether this block represents English or French — that's what
+ * lets us auto-derive the French bonus instead of asking again.
+ */
+type LangInputMode = "raw" | "clb";
+
+type LangBlock = {
+  language: OfficialLanguage;
+  inputMode: LangInputMode;
+  test: LangTest;     // ielts/celpip when language=english, tef/tcf when french
+  raw: { listening: number; reading: number; writing: number; speaking: number };
+  clb: CLBScores;
+};
 
 type FormState = {
   age: number;
   education: EducationLevel;
-  firstLangCLB: CLBScores;
-  secondLangCLB: CLBScores;
+  firstLang: LangBlock;
   hasSecondLang: boolean;
+  secondLang: LangBlock;
   canadianWorkExp: number; // years: 0,1,2,3,4,5
   hasSpouse: boolean;
   spouseEducation: EducationLevel;
-  spouseLangCLB: CLBScores;
+  spouseLang: LangBlock;
   spouseCanadianWorkExp: number;
   foreignWorkExp: number; // 0, 1, 2, 3+ (stored as 0/1/2/3)
   hasTradesCertificate: boolean;
@@ -46,8 +71,35 @@ type FormState = {
   jobOfferType: JobOfferTier;
   canadianEducation: CanadianEducationTier;
   hasSiblingInCanada: boolean;
-  frenchSkills: FrenchBonusTier;
+  /** Optional manual override; when null we auto-derive from firstLang/secondLang. */
+  frenchSkillsOverride: FrenchBonusTier | null;
 };
+
+const SKILLS: Skill[] = ["listening", "reading", "writing", "speaking"];
+
+function makeLangBlock(language: OfficialLanguage, test: LangTest, clb = 7): LangBlock {
+  const raw = { ...TEST_DEFAULTS[test] };
+  return {
+    language,
+    inputMode: "raw",
+    test,
+    raw,
+    clb: { listening: clb, reading: clb, writing: clb, speaking: clb },
+  };
+}
+
+/** Recompute clb scores from raw test results. Returns a NEW LangBlock. */
+function syncBlockClbFromRaw(block: LangBlock): LangBlock {
+  return {
+    ...block,
+    clb: {
+      listening: rawScoreToClb(block.raw.listening, block.test, "listening"),
+      reading: rawScoreToClb(block.raw.reading, block.test, "reading"),
+      writing: rawScoreToClb(block.raw.writing, block.test, "writing"),
+      speaking: rawScoreToClb(block.raw.speaking, block.test, "speaking"),
+    },
+  };
+}
 
 // CRS scoring tables are imported from lib/crs.ts above. The page-level
 // helpers below adapt those tables to the FormState shape used by the UI.
@@ -93,18 +145,18 @@ function calcCRS(form: FormState): {
 
   const langTable = hasSpouse ? FIRST_LANG_WITH_SPOUSE : FIRST_LANG_NO_SPOUSE;
   const firstLangScore =
-    getLangScoreForCLB(form.firstLangCLB.reading, langTable) +
-    getLangScoreForCLB(form.firstLangCLB.writing, langTable) +
-    getLangScoreForCLB(form.firstLangCLB.listening, langTable) +
-    getLangScoreForCLB(form.firstLangCLB.speaking, langTable);
+    getLangScoreForCLB(form.firstLang.clb.reading, langTable) +
+    getLangScoreForCLB(form.firstLang.clb.writing, langTable) +
+    getLangScoreForCLB(form.firstLang.clb.listening, langTable) +
+    getLangScoreForCLB(form.firstLang.clb.speaking, langTable);
 
   let secondLangScore = 0;
   if (form.hasSecondLang) {
     secondLangScore =
-      getLangScoreForCLB(form.secondLangCLB.reading, SECOND_LANG_SCORES) +
-      getLangScoreForCLB(form.secondLangCLB.writing, SECOND_LANG_SCORES) +
-      getLangScoreForCLB(form.secondLangCLB.listening, SECOND_LANG_SCORES) +
-      getLangScoreForCLB(form.secondLangCLB.speaking, SECOND_LANG_SCORES);
+      getLangScoreForCLB(form.secondLang.clb.reading, SECOND_LANG_SCORES) +
+      getLangScoreForCLB(form.secondLang.clb.writing, SECOND_LANG_SCORES) +
+      getLangScoreForCLB(form.secondLang.clb.listening, SECOND_LANG_SCORES) +
+      getLangScoreForCLB(form.secondLang.clb.speaking, SECOND_LANG_SCORES);
     secondLangScore = Math.min(secondLangScore, 24);
   }
 
@@ -120,29 +172,44 @@ function calcCRS(form: FormState): {
   if (hasSpouse) {
     spouseEducationScore = SPOUSE_EDUCATION_SCORES[form.spouseEducation];
     spouseLangScore =
-      getLangScoreForCLB(form.spouseLangCLB.reading, SPOUSE_LANG_SCORES) +
-      getLangScoreForCLB(form.spouseLangCLB.writing, SPOUSE_LANG_SCORES) +
-      getLangScoreForCLB(form.spouseLangCLB.listening, SPOUSE_LANG_SCORES) +
-      getLangScoreForCLB(form.spouseLangCLB.speaking, SPOUSE_LANG_SCORES);
+      getLangScoreForCLB(form.spouseLang.clb.reading, SPOUSE_LANG_SCORES) +
+      getLangScoreForCLB(form.spouseLang.clb.writing, SPOUSE_LANG_SCORES) +
+      getLangScoreForCLB(form.spouseLang.clb.listening, SPOUSE_LANG_SCORES) +
+      getLangScoreForCLB(form.spouseLang.clb.speaking, SPOUSE_LANG_SCORES);
     spouseWorkScore = SPOUSE_CANADIAN_WORK_SCORES[Math.min(form.spouseCanadianWorkExp, 5)] ?? 0;
   }
   const spouseFactors = spouseEducationScore + spouseLangScore + spouseWorkScore;
 
   // ── C. Skill Transferability (max 100 pts, with 50-pt sub-caps per group) ──
+  // Skill transferability uses the CLB of the candidate's STRONGEST first
+  // official language (per IRCC). That's just our firstLang block.
   const transfer = computeSkillTransferability({
     education: form.education,
-    firstLangCLB: form.firstLangCLB,
+    firstLangCLB: form.firstLang.clb,
     canadianWorkYears: form.canadianWorkExp,
     foreignWorkYears: form.foreignWorkExp,
     hasTradesCertificate: form.hasTradesCertificate,
   });
 
   // ── D. Additional Points ──
+  // French bonus is auto-derived from the language inputs (which language is
+  // English, which is French, what their CLBs are) unless the user has
+  // explicitly overridden via the manual picker.
+  const englishBlock = [form.firstLang, form.hasSecondLang ? form.secondLang : null]
+    .find((b) => b?.language === "english") ?? null;
+  const frenchBlock = [form.firstLang, form.hasSecondLang ? form.secondLang : null]
+    .find((b) => b?.language === "french") ?? null;
+  const derivedFrenchTier = deriveFrenchBonusTier(
+    englishBlock ? englishBlock.clb : null,
+    frenchBlock ? frenchBlock.clb : null,
+  );
+  const frenchTier = form.frenchSkillsOverride ?? derivedFrenchTier;
+
   const provincialNominationPts = form.provincialNomination ? 600 : 0;
   const jobOfferPts = getJobOfferPoints(form.jobOfferType);
   const canadianEduPts = getCanadianEducationPoints(form.canadianEducation);
   const siblingPts = form.hasSiblingInCanada ? 15 : 0;
-  const frenchPts = getFrenchBonusPoints(form.frenchSkills);
+  const frenchPts = getFrenchBonusPoints(frenchTier);
 
   const additionalPoints =
     provincialNominationPts + jobOfferPts + canadianEduPts + siblingPts + frenchPts;
@@ -180,20 +247,28 @@ function calcCRS(form: FormState): {
   };
 }
 
-// ─── Default form state ───────────────────────────────────────────────────────
+/** Picked up by the JSX — returns the auto-derived French tier so the UI can
+ * show "+25 / +50 / 0" beside the (now display-only) French row. */
+function deriveFrenchTierFromForm(form: FormState): FrenchBonusTier {
+  const eng = [form.firstLang, form.hasSecondLang ? form.secondLang : null]
+    .find((b) => b?.language === "english") ?? null;
+  const fre = [form.firstLang, form.hasSecondLang ? form.secondLang : null]
+    .find((b) => b?.language === "french") ?? null;
+  return deriveFrenchBonusTier(eng ? eng.clb : null, fre ? fre.clb : null);
+}
 
-const defaultCLB: CLBScores = { reading: 7, writing: 7, listening: 7, speaking: 7 };
+// ─── Default form state ───────────────────────────────────────────────────────
 
 const defaultForm: FormState = {
   age: 28,
   education: "bachelors_or_3yr",
-  firstLangCLB: { ...defaultCLB },
-  secondLangCLB: { reading: 4, writing: 4, listening: 4, speaking: 4 },
+  firstLang: makeLangBlock("english", "ielts", 7),
   hasSecondLang: false,
+  secondLang: makeLangBlock("french", "tef", 4),
   canadianWorkExp: 0,
   hasSpouse: false,
   spouseEducation: "bachelors_or_3yr",
-  spouseLangCLB: { reading: 4, writing: 4, listening: 4, speaking: 4 },
+  spouseLang: makeLangBlock("english", "ielts", 4),
   spouseCanadianWorkExp: 0,
   foreignWorkExp: 0,
   hasTradesCertificate: false,
@@ -201,21 +276,62 @@ const defaultForm: FormState = {
   jobOfferType: "none",
   canadianEducation: "none",
   hasSiblingInCanada: false,
-  frenchSkills: "none",
+  frenchSkillsOverride: null,
 };
 
-// Migrate any FormState shape persisted in localStorage from before the
-// 2026-05-09 grid-correctness fixes (French tiers, job offer enum,
-// Canadian-education enum, trades cert field).
+// Convert any LangBlock-shaped or legacy CLB-only language data from saved
+// localStorage into the new LangBlock structure.
+function rehydrateLangBlock(
+  saved: unknown,
+  fallback: LangBlock,
+): LangBlock {
+  if (!saved || typeof saved !== "object") return fallback;
+  const s = saved as Record<string, unknown>;
+  // Already a v3 LangBlock?
+  if (s.test && s.raw && s.clb && s.language) {
+    return {
+      language: (s.language === "french" ? "french" : "english"),
+      inputMode: (s.inputMode === "clb" ? "clb" : "raw"),
+      test: (["ielts", "celpip", "tef", "tcf"].includes(s.test as string)
+        ? (s.test as LangTest) : fallback.test),
+      raw: { ...fallback.raw, ...(s.raw as Partial<LangBlock["raw"]>) },
+      clb: { ...fallback.clb, ...(s.clb as Partial<CLBScores>) },
+    };
+  }
+  // Legacy v2: bare CLBScores object stored under firstLangCLB / secondLangCLB.
+  // Keep their CLB values, default to CLB-direct mode (so we don't fabricate
+  // raw scores they never entered).
+  const asClb = saved as Partial<CLBScores>;
+  return {
+    ...fallback,
+    inputMode: "clb",
+    clb: {
+      reading: typeof asClb.reading === "number" ? asClb.reading : fallback.clb.reading,
+      writing: typeof asClb.writing === "number" ? asClb.writing : fallback.clb.writing,
+      listening: typeof asClb.listening === "number" ? asClb.listening : fallback.clb.listening,
+      speaking: typeof asClb.speaking === "number" ? asClb.speaking : fallback.clb.speaking,
+    },
+  };
+}
+
+/**
+ * Migrate persisted state from any prior version of the form. Handles:
+ *   v1: old French / job offer / Canadian-education enum names (pre-2026-05-09)
+ *   v2: bare CLBScores stored as firstLangCLB / secondLangCLB / spouseLangCLB
+ *   v3: LangBlock structure (current)
+ */
 function migrateForm(saved: unknown): FormState {
   const f = (saved as Record<string, unknown>) ?? {};
   const legacyFrench = f.frenchSkills as string | undefined;
-  const frenchSkills: FrenchBonusTier =
+  const frenchOverride: FrenchBonusTier | null =
     legacyFrench === "clb7_plus_english_clb4" ? "clb7_french_low_english" :
     legacyFrench === "clb7_plus_no_english"   ? "clb7_french_low_english" :
-    (["none", "clb7_french_low_english", "clb7_french_strong_english"].includes(legacyFrench ?? "")
-      ? (legacyFrench as FrenchBonusTier)
-      : "none");
+    (legacyFrench === "clb7_french_low_english" || legacyFrench === "clb7_french_strong_english")
+      ? (legacyFrench as FrenchBonusTier) :
+    (f.frenchSkillsOverride === null || f.frenchSkillsOverride === undefined)
+      ? null
+      : (f.frenchSkillsOverride as FrenchBonusTier);
+
   const legacyJob = f.jobOfferType as string | undefined;
   const jobOfferType: JobOfferTier =
     legacyJob === "noc00"     ? "noc_teer_0_major_00" :
@@ -230,10 +346,14 @@ function migrateForm(saved: unknown): FormState {
     (["none", "one_or_two_year", "three_year_plus"].includes(legacyEdu ?? "")
       ? (legacyEdu as CanadianEducationTier)
       : "none");
+
   return {
     ...defaultForm,
     ...(f as Partial<FormState>),
-    frenchSkills,
+    firstLang: rehydrateLangBlock(f.firstLang ?? f.firstLangCLB, defaultForm.firstLang),
+    secondLang: rehydrateLangBlock(f.secondLang ?? f.secondLangCLB, defaultForm.secondLang),
+    spouseLang: rehydrateLangBlock(f.spouseLang ?? f.spouseLangCLB, defaultForm.spouseLang),
+    frenchSkillsOverride: frenchOverride === "none" ? null : frenchOverride,
     jobOfferType,
     canadianEducation,
     hasTradesCertificate: Boolean(f.hasTradesCertificate),
@@ -267,39 +387,186 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CLBRow({
-  label,
-  value,
+/**
+ * Editable language block — user picks language (English / French), the test
+ * type, and per-skill scores (raw test bands OR direct CLB if they already
+ * know it). The "→ CLB X" annotation under each raw input gives the user
+ * confidence that the conversion is right before they trust the score.
+ *
+ * The lockedLanguage prop locks the English/French toggle (used when the
+ * second-language block must be the OPPOSITE of the first).
+ */
+function LangBlockEditor({
+  block,
   onChange,
+  title,
+  description,
+  lockedLanguage,
 }: {
-  label: string;
-  value: CLBScores;
-  onChange: (v: CLBScores) => void;
+  block: LangBlock;
+  onChange: (b: LangBlock) => void;
+  title: string;
+  description?: string;
+  lockedLanguage?: OfficialLanguage;
 }) {
-  const skills: (keyof CLBScores)[] = ["reading", "writing", "listening", "speaking"];
+  const isFrench = block.language === "french";
+  const englishTests: LangTest[] = ["ielts", "celpip"];
+  const frenchTests: LangTest[] = ["tef", "tcf"];
+  const availableTests = isFrench ? frenchTests : englishTests;
+
+  function setLanguage(language: OfficialLanguage) {
+    if (lockedLanguage && language !== lockedLanguage) return;
+    // Switching language → pick the first test of that language
+    const newTest: LangTest = language === "french" ? "tef" : "ielts";
+    const next: LangBlock = {
+      ...block,
+      language,
+      test: newTest,
+      raw: { ...TEST_DEFAULTS[newTest] },
+    };
+    onChange(syncBlockClbFromRaw(next));
+  }
+
+  function setTest(test: LangTest) {
+    // Switching test within same language: keep mode, reset raw to defaults
+    const next: LangBlock = {
+      ...block,
+      test,
+      raw: { ...TEST_DEFAULTS[test] },
+    };
+    onChange(block.inputMode === "raw" ? syncBlockClbFromRaw(next) : next);
+  }
+
+  function setMode(mode: LangInputMode) {
+    if (mode === block.inputMode) return;
+    const next: LangBlock = { ...block, inputMode: mode };
+    onChange(mode === "raw" ? syncBlockClbFromRaw(next) : next);
+  }
+
+  function setRawSkill(skill: Skill, value: number) {
+    const nextRaw = { ...block.raw, [skill]: value };
+    onChange(syncBlockClbFromRaw({ ...block, raw: nextRaw }));
+  }
+
+  function setClbSkill(skill: Skill, value: number) {
+    onChange({ ...block, clb: { ...block.clb, [skill]: value } });
+  }
+
   return (
-    <div>
-      <Label>{label}</Label>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {skills.map((skill) => (
-          <div key={skill}>
-            <p className="text-xs text-gray-500 capitalize mb-1">{skill}</p>
-            <select
-              value={value[skill]}
-              onChange={(e) =>
-                onChange({ ...value, [skill]: Number(e.target.value) })
-              }
-              className="canada-input text-sm py-1.5"
-            >
-              {[4, 5, 6, 7, 8, 9, 10].map((clb) => (
-                <option key={clb} value={clb}>
-                  {clbLabel(clb)}
-                </option>
-              ))}
-            </select>
-          </div>
-        ))}
+    <div className="space-y-3 p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+      <div>
+        <p className="text-sm font-semibold text-gray-200">{title}</p>
+        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
       </div>
+
+      {/* Language toggle */}
+      <div>
+        <p className="text-xs uppercase tracking-wide text-gray-500 mb-1.5">Language</p>
+        <div className="flex gap-2">
+          {(["english", "french"] as const).map((lang) => {
+            const active = block.language === lang;
+            const disabled = !!lockedLanguage && lang !== lockedLanguage;
+            return (
+              <button
+                key={lang}
+                type="button"
+                disabled={disabled}
+                onClick={() => setLanguage(lang)}
+                className={`canada-pill text-xs ${active ? "active" : ""} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+              >
+                {lang === "english" ? "🇬🇧 English" : "🇫🇷 French"}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Test type picker */}
+      <div>
+        <p className="text-xs uppercase tracking-wide text-gray-500 mb-1.5">
+          {isFrench ? "French test" : "English test"}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {availableTests.map((t) => {
+            const active = block.inputMode === "raw" && block.test === t;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => { setMode("raw"); setTest(t); }}
+                className={`canada-pill text-xs ${active ? "active" : ""}`}
+              >
+                {TEST_LABEL[t]}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMode("clb")}
+            className={`canada-pill text-xs ${block.inputMode === "clb" ? "active" : ""}`}
+          >
+            I know my CLB
+          </button>
+        </div>
+      </div>
+
+      {/* Per-skill score inputs */}
+      {block.inputMode === "raw" ? (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-500 mb-1.5">
+            Your {TEST_LABEL[block.test]} bands
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {SKILLS.map((skill) => {
+              const options = TEST_SCORE_OPTIONS[block.test][skill];
+              const clb = block.clb[skill];
+              return (
+                <div key={skill}>
+                  <p className="text-xs text-gray-500 capitalize mb-1">{skill}</p>
+                  <select
+                    value={block.raw[skill]}
+                    onChange={(e) => setRawSkill(skill, Number(e.target.value))}
+                    className="canada-input text-sm py-1.5 w-full"
+                  >
+                    {options.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-gray-500 mt-0.5">→ {clbLabel(clb)}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-500 mb-1.5">
+            Your CLB scores
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {SKILLS.map((skill) => (
+              <div key={skill}>
+                <p className="text-xs text-gray-500 capitalize mb-1">{skill}</p>
+                <select
+                  value={block.clb[skill]}
+                  onChange={(e) => setClbSkill(skill, Number(e.target.value))}
+                  className="canada-input text-sm py-1.5 w-full"
+                >
+                  {[4, 5, 6, 7, 8, 9, 10].map((clb) => (
+                    <option key={clb} value={clb}>{clbLabel(clb)}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="text-[11px] text-gray-600 pt-1">
+        These scores belong to your <strong>{TEST_LANGUAGE[block.test]}</strong>{" "}
+        skills — French scores go in a separate block so the calculator can
+        award the right bonus.
+      </p>
     </div>
   );
 }
@@ -497,13 +764,27 @@ export default function CRSCalculatorPage() {
                 </p>
               </div>
 
-              {/* First language */}
-              <CLBRow
-                label="First Official Language (English or French) — CLB score per skill"
-                value={form.firstLangCLB}
-                onChange={(v) => set("firstLangCLB", v)}
+              {/* First language — pick which language, which test, then enter raw scores or CLB */}
+              <LangBlockEditor
+                title="First Official Language"
+                description="Your strongest official language (English or French). Pick the one with your highest scores."
+                block={form.firstLang}
+                onChange={(b) => {
+                  // If the user flips first-lang to French and second-lang
+                  // is also currently French, flip second-lang to English
+                  // automatically so the two stay opposite. (And vice versa.)
+                  setForm((f) => {
+                    const next: FormState = { ...f, firstLang: b };
+                    if (f.hasSecondLang && f.secondLang.language === b.language) {
+                      const otherLang: OfficialLanguage = b.language === "english" ? "french" : "english";
+                      const otherTest: LangTest = otherLang === "french" ? "tef" : "ielts";
+                      next.secondLang = makeLangBlock(otherLang, otherTest, 4);
+                    }
+                    return next;
+                  });
+                }}
               />
-              <p className="text-xs text-gray-500 -mt-2">
+              <p className="text-xs text-gray-500">
                 Total language points: <span className="text-white font-semibold">{breakdown.details.firstLanguage}</span>
                 {" "}(max {form.hasSpouse ? 128 : 136})
               </p>
@@ -517,12 +798,18 @@ export default function CRSCalculatorPage() {
 
               {form.hasSecondLang && (
                 <>
-                  <CLBRow
-                    label="Second Official Language — CLB score per skill"
-                    value={form.secondLangCLB}
-                    onChange={(v) => set("secondLangCLB", v)}
+                  <LangBlockEditor
+                    title="Second Official Language"
+                    description={
+                      form.firstLang.language === "english"
+                        ? "Your French scores. (Locked — your first language is English.)"
+                        : "Your English scores. (Locked — your first language is French.)"
+                    }
+                    block={form.secondLang}
+                    onChange={(b) => set("secondLang", b)}
+                    lockedLanguage={form.firstLang.language === "english" ? "french" : "english"}
                   />
-                  <p className="text-xs text-gray-500 -mt-2">
+                  <p className="text-xs text-gray-500">
                     Points: <span className="text-white font-semibold">{breakdown.details.secondLanguage}</span>
                     {" "}(max 24)
                   </p>
@@ -586,12 +873,13 @@ export default function CRSCalculatorPage() {
                     </p>
                   </div>
 
-                  <CLBRow
-                    label="Spouse's First Official Language — CLB score per skill"
-                    value={form.spouseLangCLB}
-                    onChange={(v) => set("spouseLangCLB", v)}
+                  <LangBlockEditor
+                    title="Spouse's First Official Language"
+                    description="Your spouse's strongest official language. Each test has its own scoring scale, so we convert for you."
+                    block={form.spouseLang}
+                    onChange={(b) => set("spouseLang", b)}
                   />
-                  <p className="text-xs text-gray-500 -mt-2">
+                  <p className="text-xs text-gray-500">
                     Spouse language points: <span className="text-white font-semibold">{breakdown.details.spouseLanguage}</span>
                     {" "}(max 20)
                   </p>
@@ -759,29 +1047,66 @@ export default function CRSCalculatorPage() {
                 />
               </div>
 
-              {/* French */}
+              {/* French — auto-derived from the language sections above */}
               <div>
-                <Label>French Language Skills (NCLC 7+ in all four French abilities)</Label>
-                <div className="flex flex-wrap gap-2">
-                  {([
-                    { val: "none", label: "No French / below NCLC 7 in any skill", pts: "0 pts" },
-                    { val: "clb7_french_low_english", label: "NCLC 7+ French + English CLB 4 or below (or no English)", pts: "+25 pts" },
-                    { val: "clb7_french_strong_english", label: "NCLC 7+ French + English CLB 5+ in all 4 skills", pts: "+50 pts" },
-                  ] as const).map(({ val, label, pts }) => (
-                    <button
-                      key={val}
-                      onClick={() => set("frenchSkills", val)}
-                      className={`canada-pill ${form.frenchSkills === val ? "active" : ""} text-xs`}
-                    >
-                      {label}
-                      <span className="ml-1 opacity-70">{pts}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-600 mt-1">
-                  Per IRCC&apos;s Oct 2022 update — strong bilingual candidates (French + English) get
-                  the full 50-pt bonus.
-                </p>
+                <Label>French Language Bonus (auto-detected)</Label>
+                {(() => {
+                  const derived = deriveFrenchTierFromForm(form);
+                  const overridden = form.frenchSkillsOverride !== null;
+                  const effective = form.frenchSkillsOverride ?? derived;
+                  const tierCopy: Record<FrenchBonusTier, { label: string; pts: string; tone: string }> = {
+                    none:                          { label: "Not eligible — need NCLC 7+ in all four French skills",           pts: "+0 pts",  tone: "text-gray-400" },
+                    clb7_french_low_english:       { label: "NCLC 7+ French + low/no English",                                  pts: "+25 pts", tone: "text-green-300" },
+                    clb7_french_strong_english:    { label: "NCLC 7+ French + English CLB 5+ in all 4 — strong bilingual",     pts: "+50 pts", tone: "text-green-300" },
+                  };
+                  const c = tierCopy[effective];
+                  return (
+                    <div className={`canada-card p-3 ${overridden ? "border-yellow-500/30" : ""}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className={`text-sm font-medium ${c.tone}`}>{c.label}</p>
+                        <span className={`text-base font-bold ${c.tone}`}>{c.pts}</span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-2">
+                        {overridden ? (
+                          <>You&apos;ve overridden the auto-detected tier. </>
+                        ) : (
+                          <>Computed from your English + French language scores above. </>
+                        )}
+                        Per IRCC&apos;s Oct 2022 update — strong bilingual candidates get the full 50-pt bonus.
+                      </p>
+                      {overridden && (
+                        <button
+                          type="button"
+                          onClick={() => set("frenchSkillsOverride", null)}
+                          className="text-xs text-yellow-400 hover:underline mt-2"
+                        >
+                          Reset to auto-detect ({tierCopy[derived].label.split("—")[0].trim()})
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+                <details className="mt-2">
+                  <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-300">
+                    Override manually (only if you need to)
+                  </summary>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {([
+                      { val: "none", label: "Force: no French bonus", pts: "0 pts" },
+                      { val: "clb7_french_low_english", label: "Force: +25 pts", pts: "+25 pts" },
+                      { val: "clb7_french_strong_english", label: "Force: +50 pts", pts: "+50 pts" },
+                    ] as const).map(({ val, label, pts }) => (
+                      <button
+                        key={val}
+                        onClick={() => set("frenchSkillsOverride", val)}
+                        className={`canada-pill text-xs ${form.frenchSkillsOverride === val ? "active" : ""}`}
+                      >
+                        {label}
+                        <span className="ml-1 opacity-70">{pts}</span>
+                      </button>
+                    ))}
+                  </div>
+                </details>
               </div>
             </SectionCard>
           </div>

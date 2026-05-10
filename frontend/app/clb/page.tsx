@@ -4,69 +4,55 @@ import { useState } from "react";
 import PageLayout from "@/components/PageLayout";
 import DataFreshness from "@/components/DataFreshness";
 import { CLB_TABLES } from "@/lib/ircc-data";
+import {
+  rawScoreToClb,
+  getTestThresholds,
+  CLB_LEVELS,
+  FIRST_LANG_NO_SPOUSE,
+  type LangTest,
+  type Skill,
+} from "@/lib/crs";
 
-const IELTS_TABLE = [
-  { clb: 10, L: 8.5, R: 8.0, W: 7.5, S: 7.5 },
-  { clb: 9,  L: 8.0, R: 7.0, W: 7.0, S: 7.0 },
-  { clb: 8,  L: 7.5, R: 6.5, W: 6.5, S: 6.5 },
-  { clb: 7,  L: 6.0, R: 6.0, W: 6.0, S: 6.0 },
-  { clb: 6,  L: 5.5, R: 5.0, W: 5.5, S: 5.5 },
-  { clb: 5,  L: 5.0, R: 4.0, W: 5.0, S: 5.0 },
-  { clb: 4,  L: 4.5, R: 3.5, W: 4.0, S: 4.0 },
-];
-
-// TEF Canada — minimum raw scores per CLB level (L:0-360, R:0-300, W:0-450, S:0-450)
-const TEF_TABLE = [
-  { clb: 10, L: 316, R: 263, W: 393, S: 393 },
-  { clb: 9,  L: 298, R: 248, W: 371, S: 371 },
-  { clb: 8,  L: 280, R: 233, W: 349, S: 349 },
-  { clb: 7,  L: 249, R: 207, W: 310, S: 310 },
-  { clb: 6,  L: 217, R: 181, W: 271, S: 271 },
-  { clb: 5,  L: 181, R: 151, W: 226, S: 226 },
-  { clb: 4,  L: 145, R: 121, W: 181, S: 181 },
-];
-
-// TCF Canada — minimum scores per CLB (L/R:100-699, W/S:1-20)
-const TCF_TABLE = [
-  { clb: 10, L: 549, R: 549, W: 16, S: 16 },
-  { clb: 9,  L: 523, R: 524, W: 14, S: 14 },
-  { clb: 8,  L: 503, R: 499, W: 12, S: 12 },
-  { clb: 7,  L: 458, R: 453, W: 10, S: 10 },
-  { clb: 6,  L: 398, R: 406, W: 7,  S: 7  },
-  { clb: 5,  L: 369, R: 375, W: 6,  S: 6  },
-  { clb: 4,  L: 331, R: 342, W: 4,  S: 4  },
-];
-
-function getIELTSCLB(score: number, skill: "L" | "R" | "W" | "S"): number {
-  for (const row of IELTS_TABLE) {
-    if (score >= row[skill]) return row.clb;
-  }
-  return 3;
-}
-
-function getCELPIPCLB(level: number): number {
-  if (level < 1) return 0;
-  if (level > 12) return 12;
-  return level;
-}
-
-function getTEFCLB(score: number, skill: "L" | "R" | "W" | "S"): number {
-  for (const row of TEF_TABLE) {
-    if (score >= row[skill]) return row.clb;
-  }
-  return 3;
-}
-
-function getTCFCLB(score: number, skill: "L" | "R" | "W" | "S"): number {
-  for (const row of TCF_TABLE) {
-    if (score >= row[skill]) return row.clb;
-  }
-  return 3;
-}
-
-const CLB_POINTS: Record<number, number> = {
-  10: 32, 9: 29, 8: 22, 7: 16, 6: 8, 5: 6, 4: 6,
+// /clb's UI uses single-letter skill keys (L/R/W/S) but the centralized
+// rawScoreToClb expects the full Skill names. Translate at the boundary.
+const SKILL_KEY: Record<"L" | "R" | "W" | "S", Skill> = {
+  L: "listening", R: "reading", W: "writing", S: "speaking",
 };
+
+function convertToClb(test: LangTest, raw: number, skillKey: "L" | "R" | "W" | "S"): number {
+  return rawScoreToClb(raw, test, SKILL_KEY[skillKey]);
+}
+
+// Per-skill CRS points for an applicant WITHOUT a spouse (the larger,
+// more aspirational column to show on a generic CLB tool).
+const CLB_POINTS = FIRST_LANG_NO_SPOUSE;
+
+/**
+ * Build a {clb, L, R, W, S} table for the equivalency reference table from
+ * the centralized lib/crs thresholds. Replaces the locally-duplicated
+ * IELTS_TABLE / TEF_TABLE / TCF_TABLE.
+ */
+function buildEquivalencyRows(
+  test: LangTest,
+): ReadonlyArray<{ clb: number; L: number; R: number; W: number; S: number }> {
+  const thresholds = getTestThresholds(test);
+  if (!thresholds) return [];
+  function minFor(skill: Skill, clb: number): number {
+    const row = thresholds![skill].find((r) => r.clb === clb);
+    return row ? row.min : 0;
+  }
+  return CLB_LEVELS.map((clb) => ({
+    clb,
+    L: minFor("listening", clb),
+    R: minFor("reading", clb),
+    W: minFor("writing", clb),
+    S: minFor("speaking", clb),
+  }));
+}
+
+const IELTS_TABLE = buildEquivalencyRows("ielts");
+const TEF_TABLE = buildEquivalencyRows("tef");
+const TCF_TABLE = buildEquivalencyRows("tcf");
 
 function clbColor(clb: number) {
   if (clb >= 9) return "#4ade80";
@@ -84,43 +70,26 @@ const IELTS_SKILLS = [
 
 const CELPIP_LEVELS = ["4","5","6","7","8","9","10","11","12"];
 
-type TestType = "ielts" | "celpip" | "tef" | "tcf";
-
 export default function CLBPage() {
-  const [test, setTest] = useState<TestType>("ielts");
+  const [test, setTest] = useState<LangTest>("ielts");
   const [ielts, setIelts] = useState({ L: "", R: "", W: "", S: "" });
   const [celpip, setCelpip] = useState({ L: "", R: "", W: "", S: "" });
   const [tef, setTef] = useState({ L: "", R: "", W: "", S: "" });
   const [tcf, setTcf] = useState({ L: "", R: "", W: "", S: "" });
 
-  const results: { L: number | null; R: number | null; W: number | null; S: number | null } =
-    test === "ielts"
-      ? {
-          L: ielts.L ? getIELTSCLB(parseFloat(ielts.L), "L") : null,
-          R: ielts.R ? getIELTSCLB(parseFloat(ielts.R), "R") : null,
-          W: ielts.W ? getIELTSCLB(parseFloat(ielts.W), "W") : null,
-          S: ielts.S ? getIELTSCLB(parseFloat(ielts.S), "S") : null,
-        }
-      : test === "celpip"
-      ? {
-          L: celpip.L ? getCELPIPCLB(parseInt(celpip.L)) : null,
-          R: celpip.R ? getCELPIPCLB(parseInt(celpip.R)) : null,
-          W: celpip.W ? getCELPIPCLB(parseInt(celpip.W)) : null,
-          S: celpip.S ? getCELPIPCLB(parseInt(celpip.S)) : null,
-        }
-      : test === "tef"
-      ? {
-          L: tef.L ? getTEFCLB(parseInt(tef.L), "L") : null,
-          R: tef.R ? getTEFCLB(parseInt(tef.R), "R") : null,
-          W: tef.W ? getTEFCLB(parseInt(tef.W), "W") : null,
-          S: tef.S ? getTEFCLB(parseInt(tef.S), "S") : null,
-        }
-      : {
-          L: tcf.L ? getTCFCLB(parseInt(tcf.L), "L") : null,
-          R: tcf.R ? getTCFCLB(parseInt(tcf.R), "R") : null,
-          W: tcf.W ? getTCFCLB(parseInt(tcf.W), "W") : null,
-          S: tcf.S ? getTCFCLB(parseInt(tcf.S), "S") : null,
-        };
+  function rawFor(skill: "L" | "R" | "W" | "S"): string {
+    if (test === "ielts") return ielts[skill];
+    if (test === "celpip") return celpip[skill];
+    if (test === "tef") return tef[skill];
+    return tcf[skill];
+  }
+
+  const results: { L: number | null; R: number | null; W: number | null; S: number | null } = {
+    L: rawFor("L") ? convertToClb(test, parseFloat(rawFor("L")), "L") : null,
+    R: rawFor("R") ? convertToClb(test, parseFloat(rawFor("R")), "R") : null,
+    W: rawFor("W") ? convertToClb(test, parseFloat(rawFor("W")), "W") : null,
+    S: rawFor("S") ? convertToClb(test, parseFloat(rawFor("S")), "S") : null,
+  };
 
   const validResults = Object.values(results).filter((v): v is number => v !== null);
   const minCLB = validResults.length === 4 ? Math.min(...validResults) : null;
@@ -166,7 +135,8 @@ export default function CLBPage() {
           </div>
           {(test === "tef" || test === "tcf") && (
             <p className="text-xs text-blue-400 mt-3">
-              French language tests — CLB 7+ in French earns +15 to +30 bonus CRS points.
+              French language tests — NCLC 7+ in all four French skills earns
+              <strong> +25 bonus CRS points</strong> (or <strong>+50</strong> if you also have CLB 5+ in all 4 English skills).
             </p>
           )}
         </div>
