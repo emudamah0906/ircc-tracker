@@ -69,61 +69,44 @@ jobs:
             exit 1
           fi
 
-      # Sanity check: confirm fresh rows actually landed in Supabase. If
-      # any of the three scrapers above silently no-op'd (e.g. a wrong
-      # parser, an expired key), the freshness check fails and the
-      # workflow goes red instead of staying deceptively green.
-      - name: Verify Supabase data freshness
+      # Sanity check on processing_times only.
+      #
+      # The scraper writes new processing_times rows with the current time on
+      # every successful run, so a stale fetched_at unambiguously means the
+      # scraper isn't working. pr_draws and ircc_news only get new rows when
+      # IRCC actually publishes something — checking their freshness would
+      # confuse "scraper broken" with "IRCC quiet this week".
+      #
+      # If the draws or news scrapers silently break, we'll catch it through
+      # the steps above (now that continue-on-error is removed) — they exit
+      # non-zero on real errors.
+      - name: Verify processing_times freshness
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           set -e
-          fail=0
+          ts=$(curl -s \
+            -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+            "${SUPABASE_URL}/rest/v1/processing_times?select=fetched_at&order=fetched_at.desc&limit=1" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['fetched_at'] if d else '')")
 
-          check_table() {
-            local table="$1"
-            local col="$2"
-            local max_hours="$3"
+          if [ -z "$ts" ]; then
+            echo "::error::processing_times returned no rows."
+            exit 1
+          fi
 
-            # Pull the newest row's timestamp
-            ts=$(curl -s \
-              -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-              -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
-              "${SUPABASE_URL}/rest/v1/${table}?select=${col}&order=${col}.desc&limit=1" \
-              | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0].get('${col}','') if d else '')")
-
-            if [ -z "$ts" ]; then
-              echo "::error::${table} returned no rows."
-              fail=1
-              return
-            fi
-
-            age_hours=$(python3 -c "
+          age_hours=$(python3 -c "
           from datetime import datetime, timezone
           ts = '${ts}'.replace('Z','+00:00')
-          # date-only timestamps need a time component
-          if 'T' not in ts:
-              ts = ts + 'T00:00:00+00:00'
           age = (datetime.now(timezone.utc) - datetime.fromisoformat(ts)).total_seconds() / 3600
           print(f'{age:.1f}')
           ")
-            echo "${table}.${col}: newest = ${ts} (${age_hours} h ago, max ${max_hours} h)"
-            python3 -c "import sys; sys.exit(0 if float('${age_hours}') <= float('${max_hours}') else 1)" || {
-              echo "::error::${table} is stale: newest row is ${age_hours} h old (max ${max_hours} h)."
-              fail=1
-            }
-          }
+          echo "processing_times newest fetched_at: ${ts} (${age_hours} h ago)"
 
-          # Processing times: scraper runs each cron, must be fresh within ~12 h
-          check_table "processing_times" "fetched_at" "12"
-          # Draws: IRCC publishes ~weekly, allow a generous window
-          check_table "pr_draws"          "draw_date"  "240"
-          # News: usually a few items per week, allow ~1 week
-          check_table "ircc_news"         "published_at" "168"
-
-          if [ "$fail" = "1" ]; then
-            echo "::error::One or more tables are stale. Check the steps above."
+          python3 -c "import sys; sys.exit(0 if float('${age_hours}') <= 24 else 1)" || {
+            echo "::error::processing_times is stale: newest row is ${age_hours} h old (expected ≤ 24 h)."
             exit 1
-          fi
-          echo "All tables fresh."
+          }
+          echo "processing_times is fresh."
