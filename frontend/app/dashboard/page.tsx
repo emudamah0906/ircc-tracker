@@ -13,9 +13,12 @@ import {
   getSpouseEducationPoints,
   getSpouseLangPoints,
   getSpouseCanadianWorkPoints,
+  computeSkillTransferability,
   rawScoreToClb,
+  type CLBScores,
   type EducationLevel,
   type LangTest,
+  type Skill,
 } from "@/lib/crs";
 
 type Profile = {
@@ -76,65 +79,67 @@ function normalizeEducation(value: string | undefined | null): EducationLevel {
 }
 
 // ── CRS Calculation — shape adapter that wraps lib/crs helpers ────────────────
+/**
+ * Wraps the saved Profile shape and calls the canonical helpers in lib/crs.ts.
+ * /crs and /dashboard now share identical scoring logic — the only difference
+ * is that the saved profile model uses booleans for job offer / Canadian
+ * education / French (no granular tier), so the dashboard awards the lower
+ * tier in those cases. The /crs page captures full granularity.
+ */
 function calcCRS(p: Profile): { total: number; breakdown: Record<string, number> } {
   const hasSpouse = p.marital_status === "married";
   const breakdown: Record<string, number> = {};
 
-  // A: Core human capital
+  // ── First-language CLB (per-skill IELTS GT or CELPIP passthrough) ──
+  const firstLangCLB: CLBScores = {
+    reading: rawScoreToClb(p.first_lang_reading, p.lang_test, "reading"),
+    writing: rawScoreToClb(p.first_lang_writing, p.lang_test, "writing"),
+    listening: rawScoreToClb(p.first_lang_listening, p.lang_test, "listening"),
+    speaking: rawScoreToClb(p.first_lang_speaking, p.lang_test, "speaking"),
+  };
+
+  // ── A: Core human capital ──
   breakdown.age = getAgePoints(p.age, hasSpouse);
   breakdown.education = getEducationPoints(p.education, hasSpouse);
-
-  const r = rawScoreToClb(p.first_lang_reading, p.lang_test);
-  const w = rawScoreToClb(p.first_lang_writing, p.lang_test);
-  const l = rawScoreToClb(p.first_lang_listening, p.lang_test);
-  const s = rawScoreToClb(p.first_lang_speaking, p.lang_test);
   breakdown.language =
-    getFirstLangPoints(r, hasSpouse) +
-    getFirstLangPoints(w, hasSpouse) +
-    getFirstLangPoints(l, hasSpouse) +
-    getFirstLangPoints(s, hasSpouse);
-
+    getFirstLangPoints(firstLangCLB.reading, hasSpouse) +
+    getFirstLangPoints(firstLangCLB.writing, hasSpouse) +
+    getFirstLangPoints(firstLangCLB.listening, hasSpouse) +
+    getFirstLangPoints(firstLangCLB.speaking, hasSpouse);
   breakdown.canadaWork = getCanadianWorkPoints(p.canada_work_years, hasSpouse);
 
-  // B: Spouse factors
+  // ── B: Spouse factors ──
   breakdown.spouse = 0;
   if (hasSpouse) {
     breakdown.spouse += getSpouseEducationPoints(p.spouse_education);
-    const sr = rawScoreToClb(p.spouse_lang_reading, p.lang_test);
-    const sw = rawScoreToClb(p.spouse_lang_writing, p.lang_test);
-    const sl = rawScoreToClb(p.spouse_lang_listening, p.lang_test);
-    const ss = rawScoreToClb(p.spouse_lang_speaking, p.lang_test);
     breakdown.spouse +=
-      getSpouseLangPoints(sr) + getSpouseLangPoints(sw) +
-      getSpouseLangPoints(sl) + getSpouseLangPoints(ss);
+      getSpouseLangPoints(rawScoreToClb(p.spouse_lang_reading, p.lang_test, "reading")) +
+      getSpouseLangPoints(rawScoreToClb(p.spouse_lang_writing, p.lang_test, "writing")) +
+      getSpouseLangPoints(rawScoreToClb(p.spouse_lang_listening, p.lang_test, "listening")) +
+      getSpouseLangPoints(rawScoreToClb(p.spouse_lang_speaking, p.lang_test, "speaking"));
     breakdown.spouse += getSpouseCanadianWorkPoints(p.spouse_canada_work_years);
   }
 
-  // C: Skill transferability (max 100)
-  let transferability = 0;
-  const avgCLB = (r + w + l + s) / 4;
-  const highEdu: EducationLevel[] = ["bachelors_or_3yr", "two_or_more_certs", "masters", "doctoral"];
-  const isHighEdu = highEdu.includes(p.education);
+  // ── C: Skill transferability (with proper 50-pt sub-caps + 100-pt overall cap) ──
+  const transfer = computeSkillTransferability({
+    education: p.education,
+    firstLangCLB,
+    canadianWorkYears: p.canada_work_years,
+    foreignWorkYears: p.foreign_work_years,
+    // Profile model has no trades-cert field — see /crs for full granularity.
+  });
+  breakdown.transferability = transfer.total;
 
-  if (isHighEdu && avgCLB >= 9) transferability += 50;
-  else if (isHighEdu && avgCLB >= 7) transferability += 25;
-
-  if (isHighEdu && p.canada_work_years >= 1) transferability += 25;
-
-  if (p.foreign_work_years >= 3 && p.canada_work_years >= 1) transferability += 25;
-  else if (p.foreign_work_years >= 1 && p.canada_work_years >= 1) transferability += 13;
-
-  if (p.foreign_work_years >= 3 && avgCLB >= 9) transferability += 50;
-  else if (p.foreign_work_years >= 1 && avgCLB >= 7) transferability += 25;
-
-  breakdown.transferability = Math.min(100, transferability);
-
-  // D: Additional points
-  breakdown.additional = 0;
-  if (p.has_provincial_nomination) breakdown.additional += 600;
-  if (p.has_job_offer) breakdown.additional += 50;
-  if (p.has_canadian_sibling) breakdown.additional += 15;
-  if (p.has_canadian_education) breakdown.additional += 15;
+  // ── D: Additional points ──
+  // Profile uses booleans, so we always award the lower tier:
+  //   - Job offer: 50 pts (the +200 senior-mgmt tier needs NOC distinction)
+  //   - Canadian education: 15 pts (the +30 3-yr tier needs program length)
+  //   - French bonus: not captured in profile → 0 pts
+  breakdown.additional =
+    (p.has_provincial_nomination ? 600 : 0) +
+    (p.has_job_offer ? 50 : 0) +
+    (p.has_canadian_sibling ? 15 : 0) +
+    (p.has_canadian_education ? 15 : 0);
 
   const total = Math.min(1200,
     breakdown.age + breakdown.education + breakdown.language +
@@ -146,8 +151,12 @@ function calcCRS(p: Profile): { total: number; breakdown: Record<string, number>
 function getTips(p: Profile, score: number, cutoff: number): string[] {
   const tips: string[] = [];
   const gap = cutoff - score;
-  const avgCLB = (rawScoreToClb(p.first_lang_reading, p.lang_test) + rawScoreToClb(p.first_lang_writing, p.lang_test) +
-    rawScoreToClb(p.first_lang_listening, p.lang_test) + rawScoreToClb(p.first_lang_speaking, p.lang_test)) / 4;
+  const minCLB = Math.min(
+    rawScoreToClb(p.first_lang_reading, p.lang_test, "reading"),
+    rawScoreToClb(p.first_lang_writing, p.lang_test, "writing"),
+    rawScoreToClb(p.first_lang_listening, p.lang_test, "listening"),
+    rawScoreToClb(p.first_lang_speaking, p.lang_test, "speaking"),
+  );
 
   if (!p.has_provincial_nomination)
     tips.push("🏆 Provincial Nomination (PNP) adds 600 pts instantly — explore OINP, BC PNP, AINP");
@@ -157,8 +166,8 @@ function getTips(p: Profile, score: number, cutoff: number): string[] {
     tips.push("🇨🇦 At least 1 year of Canadian work experience adds 40 points");
   if (p.canada_work_years >= 1 && p.canada_work_years < 3)
     tips.push("🇨🇦 Increasing Canadian work experience to 3+ years adds up to 80 points");
-  if (avgCLB < 9)
-    tips.push("🗣 Improving language to CLB 9 in all skills significantly boosts both core and transferability points");
+  if (minCLB < 9)
+    tips.push("🗣 Reaching CLB 9 in your weakest language skill unlocks both core and skill-transferability bonuses");
   if (gap > 0 && gap <= 50)
     tips.push(`📈 Only ${gap} pts below cut-off — a small improvement could get you an ITA!`);
   if (!p.has_canadian_sibling)
@@ -314,8 +323,8 @@ export default function Dashboard() {
               </p>
               <div className="grid grid-cols-2 gap-4">
                 {(["first_lang_reading","first_lang_writing","first_lang_listening","first_lang_speaking"] as const).map(key => {
-                  const skill = key.replace("first_lang_","");
-                  const clb = rawScoreToClb(profile[key], profile.lang_test);
+                  const skill = key.replace("first_lang_","") as Skill;
+                  const clb = rawScoreToClb(profile[key], profile.lang_test, skill);
                   return (
                     <div key={key}>
                       <label className="text-xs text-gray-400 mb-1 block capitalize">
@@ -351,8 +360,8 @@ export default function Dashboard() {
                   <label className="text-xs text-gray-400 mb-1 block">Spouse Language Scores ({profile.lang_test.toUpperCase()})</label>
                   <div className="grid grid-cols-2 gap-3">
                     {(["spouse_lang_reading","spouse_lang_writing","spouse_lang_listening","spouse_lang_speaking"] as const).map(key => {
-                      const skill = key.replace("spouse_lang_","");
-                      const clb = rawScoreToClb(profile[key], profile.lang_test);
+                      const skill = key.replace("spouse_lang_","") as Skill;
+                      const clb = rawScoreToClb(profile[key], profile.lang_test, skill);
                       return (
                         <div key={key}>
                           <label className="text-xs text-gray-500 mb-1 block capitalize">

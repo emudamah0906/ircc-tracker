@@ -22,8 +22,28 @@ export type EducationLevel =
 
 export type LangTest = "ielts" | "celpip";
 
+export type Skill = "listening" | "reading" | "writing" | "speaking";
+
+export type CLBScores = {
+  reading: number;
+  writing: number;
+  listening: number;
+  speaking: number;
+};
+
 /** [no_spouse, with_spouse] — common shape for the spouse-dependent tables. */
 type Pair = [noSpouse: number, withSpouse: number];
+
+function minClb(scores: CLBScores): number {
+  return Math.min(scores.reading, scores.writing, scores.listening, scores.speaking);
+}
+
+const HIGH_EDU: EducationLevel[] = [
+  "bachelors_or_3yr", "two_or_more_certs", "masters", "doctoral",
+];
+const POST_SECONDARY_EDU: EducationLevel[] = [
+  "one_year_diploma", "two_year_diploma", ...HIGH_EDU,
+];
 
 // ─── A. Core human capital ──────────────────────────────────────────────────
 
@@ -134,22 +154,41 @@ export function getSpouseCanadianWorkPoints(years: number): number {
 }
 
 // ─── IELTS / CELPIP → CLB conversion ────────────────────────────────────────
-// IRCC's official equivalency for IELTS General Training. CELPIP scores are
-// already on the CLB scale.
+// IRCC's official equivalency for IELTS General Training is per-skill — the
+// thresholds for Listening, Reading, Writing, and Speaking are different from
+// each other, so the same band score maps to different CLB values depending
+// on which skill it belongs to. CELPIP is already on the CLB scale.
 
-export function rawScoreToClb(raw: number, test: LangTest): number {
+const IELTS_GT_TO_CLB: Record<Skill, ReadonlyArray<{ min: number; clb: number }>> = {
+  // Each table is sorted highest → lowest; first match wins.
+  listening: [
+    { min: 8.5, clb: 10 }, { min: 8.0, clb: 9 }, { min: 7.5, clb: 8 },
+    { min: 6.0, clb: 7 },  { min: 5.5, clb: 6 }, { min: 5.0, clb: 5 },
+    { min: 4.5, clb: 4 },
+  ],
+  reading: [
+    { min: 8.0, clb: 10 }, { min: 7.0, clb: 9 }, { min: 6.5, clb: 8 },
+    { min: 6.0, clb: 7 },  { min: 5.0, clb: 6 }, { min: 4.0, clb: 5 },
+    { min: 3.5, clb: 4 },
+  ],
+  writing: [
+    { min: 7.5, clb: 10 }, { min: 7.0, clb: 9 }, { min: 6.5, clb: 8 },
+    { min: 6.0, clb: 7 },  { min: 5.5, clb: 6 }, { min: 5.0, clb: 5 },
+    { min: 4.0, clb: 4 },
+  ],
+  speaking: [
+    { min: 7.5, clb: 10 }, { min: 7.0, clb: 9 }, { min: 6.5, clb: 8 },
+    { min: 6.0, clb: 7 },  { min: 5.5, clb: 6 }, { min: 5.0, clb: 5 },
+    { min: 4.0, clb: 4 },
+  ],
+};
+
+export function rawScoreToClb(raw: number, test: LangTest, skill: Skill): number {
   if (test === "celpip") return Math.min(10, Math.max(1, Math.round(raw)));
-  // IELTS General Training. Per-skill thresholds vary slightly across the
-  // official chart (listening, reading, writing, speaking) but the
-  // simplified mapping below is what /dashboard's free calculator uses.
-  if (raw >= 8.5) return 10;
-  if (raw >= 8.0) return 9;
-  if (raw >= 7.0) return 8;
-  if (raw >= 6.5) return 7;
-  if (raw >= 6.0) return 6;
-  if (raw >= 5.5) return 5;
-  if (raw >= 5.0) return 4;
-  return 3;
+  for (const { min, clb } of IELTS_GT_TO_CLB[skill]) {
+    if (raw >= min) return clb;
+  }
+  return 0;
 }
 
 // ─── Re-exports for back-compat with /crs's record-based lookups ─────────────
@@ -194,3 +233,156 @@ export const AGE_SCORES_WITH_SPOUSE: Record<string, number> = (() => {
 export const SPOUSE_EDUCATION_SCORES = SPOUSE_EDUCATION_POINTS;
 export const SPOUSE_LANG_SCORES = SPOUSE_LANG_PER_SKILL;
 export const SPOUSE_CANADIAN_WORK_SCORES = SPOUSE_CANADIAN_WORK_POINTS;
+
+// ─── C. Skill transferability (max 100) ─────────────────────────────────────
+// Each of the three groups (education, foreign work, trades cert) caps at 50,
+// and the overall total then caps at 100. Both /crs and /dashboard call
+// computeSkillTransferability so the sub-caps are applied identically.
+
+export function getEducationPlusLangPoints(
+  education: EducationLevel,
+  firstLangCLB: CLBScores,
+): number {
+  if (!POST_SECONDARY_EDU.includes(education)) return 0;
+  const m = minClb(firstLangCLB);
+  if (m < 7) return 0;
+  const isHighEdu = HIGH_EDU.includes(education);
+  if (m >= 9) return isHighEdu ? 50 : 25;
+  return isHighEdu ? 25 : 13;
+}
+
+export function getEducationPlusCanadianWorkPoints(
+  education: EducationLevel,
+  canadianWorkYears: number,
+): number {
+  if (!POST_SECONDARY_EDU.includes(education)) return 0;
+  if (canadianWorkYears < 1) return 0;
+  const isHighEdu = HIGH_EDU.includes(education);
+  if (canadianWorkYears >= 2) return isHighEdu ? 50 : 25;
+  return isHighEdu ? 25 : 13;
+}
+
+export function getForeignWorkPlusLangPoints(
+  foreignWorkYears: number,
+  firstLangCLB: CLBScores,
+): number {
+  if (foreignWorkYears < 1) return 0;
+  const m = minClb(firstLangCLB);
+  if (m < 7) return 0;
+  if (foreignWorkYears >= 3) return m >= 9 ? 50 : 25;
+  return m >= 9 ? 25 : 13;
+}
+
+export function getForeignPlusCanadianWorkPoints(
+  foreignWorkYears: number,
+  canadianWorkYears: number,
+): number {
+  if (foreignWorkYears < 1 || canadianWorkYears < 1) return 0;
+  if (foreignWorkYears >= 3 && canadianWorkYears >= 2) return 50;
+  if (foreignWorkYears >= 3 || canadianWorkYears >= 2) return 25;
+  return 13;
+}
+
+/** Certificate of qualification (in a trade, issued by a Canadian province). */
+export function getTradesCertificatePlusLangPoints(
+  hasCertificate: boolean,
+  firstLangCLB: CLBScores,
+): number {
+  if (!hasCertificate) return 0;
+  const m = minClb(firstLangCLB);
+  if (m < 5) return 0;
+  if (m >= 7) return 50;
+  return 25;
+}
+
+export type TransferabilityInput = {
+  education: EducationLevel;
+  firstLangCLB: CLBScores;
+  canadianWorkYears: number;
+  foreignWorkYears: number;
+  hasTradesCertificate?: boolean;
+};
+
+export type TransferabilityResult = {
+  total: number;
+  details: {
+    eduLang: number;
+    eduWork: number;
+    foreignLang: number;
+    foreignCanadian: number;
+    tradesLang: number;
+    educationGroup: number;     // capped at 50
+    foreignWorkGroup: number;   // capped at 50
+    tradesGroup: number;         // capped at 50 (trades cert is its own group)
+  };
+};
+
+/**
+ * IRCC has 3 sub-caps (50 each) before the overall 100 cap:
+ *   - Education group:    Edu+Lang + Edu+CanWork
+ *   - Foreign work group: Foreign+Lang + Foreign+CanWork
+ *   - Trades cert group:  Cert+Lang
+ * The previous /crs implementation skipped the sub-caps and only applied the
+ * overall 100 cap, which silently inflated some profiles by up to 50 points.
+ */
+export function computeSkillTransferability(input: TransferabilityInput): TransferabilityResult {
+  const eduLang = getEducationPlusLangPoints(input.education, input.firstLangCLB);
+  const eduWork = getEducationPlusCanadianWorkPoints(input.education, input.canadianWorkYears);
+  const foreignLang = getForeignWorkPlusLangPoints(input.foreignWorkYears, input.firstLangCLB);
+  const foreignCanadian = getForeignPlusCanadianWorkPoints(
+    input.foreignWorkYears, input.canadianWorkYears,
+  );
+  const tradesLang = getTradesCertificatePlusLangPoints(
+    input.hasTradesCertificate ?? false, input.firstLangCLB,
+  );
+
+  const educationGroup = Math.min(50, eduLang + eduWork);
+  const foreignWorkGroup = Math.min(50, foreignLang + foreignCanadian);
+  const tradesGroup = Math.min(50, tradesLang);
+
+  const total = Math.min(100, educationGroup + foreignWorkGroup + tradesGroup);
+
+  return {
+    total,
+    details: {
+      eduLang, eduWork, foreignLang, foreignCanadian, tradesLang,
+      educationGroup, foreignWorkGroup, tradesGroup,
+    },
+  };
+}
+
+// ─── D. Additional points ───────────────────────────────────────────────────
+
+export type FrenchBonusTier =
+  | "none"                          // No French OR French below CLB 7 in any skill
+  | "clb7_french_low_english"       // French CLB 7+ all skills + English CLB 4 or below (or no English)
+  | "clb7_french_strong_english";   // French CLB 7+ all skills + English CLB 5+ all skills
+
+/**
+ * IRCC updated these in October 2022 (used to be 15/30, now 25/50).
+ * Cap: 50 pts. The "strong English" tier rewards true bilingual candidates.
+ */
+export function getFrenchBonusPoints(tier: FrenchBonusTier): number {
+  if (tier === "clb7_french_strong_english") return 50;
+  if (tier === "clb7_french_low_english") return 25;
+  return 0;
+}
+
+export type JobOfferTier =
+  | "none"
+  | "noc_teer_0_major_00"   // Senior management — 200 pts
+  | "noc_teer_0_1_2_3";     // Other valid NOC — 50 pts
+
+export function getJobOfferPoints(tier: JobOfferTier): number {
+  if (tier === "noc_teer_0_major_00") return 200;
+  if (tier === "noc_teer_0_1_2_3") return 50;
+  return 0;
+}
+
+export type CanadianEducationTier = "none" | "one_or_two_year" | "three_year_plus";
+
+export function getCanadianEducationPoints(tier: CanadianEducationTier): number {
+  if (tier === "three_year_plus") return 30;
+  if (tier === "one_or_two_year") return 15;
+  return 0;
+}

@@ -18,15 +18,16 @@ import {
   SPOUSE_EDUCATION_SCORES,
   SPOUSE_LANG_SCORES,
   SPOUSE_CANADIAN_WORK_SCORES,
+  computeSkillTransferability,
+  getFrenchBonusPoints,
+  getJobOfferPoints,
+  getCanadianEducationPoints,
   type EducationLevel,
+  type CLBScores,
+  type FrenchBonusTier,
+  type JobOfferTier,
+  type CanadianEducationTier,
 } from "@/lib/crs";
-
-type CLBScores = {
-  reading: number;
-  writing: number;
-  listening: number;
-  speaking: number;
-};
 
 type FormState = {
   age: number;
@@ -40,14 +41,12 @@ type FormState = {
   spouseLangCLB: CLBScores;
   spouseCanadianWorkExp: number;
   foreignWorkExp: number; // 0, 1, 2, 3+ (stored as 0/1/2/3)
+  hasTradesCertificate: boolean;
   provincialNomination: boolean;
-  jobOfferType: "none" | "noc00" | "other_noc";
-  canadianEducation: "none" | "one_two_yr" | "three_plus_yr";
+  jobOfferType: JobOfferTier;
+  canadianEducation: CanadianEducationTier;
   hasSiblingInCanada: boolean;
-  frenchSkills: "none" | "clb7_plus_english_clb4" | "clb7_plus_no_english";
-  // Skill transferability combos
-  educationPlusForeignWork: boolean;
-  foreignWorkPlusCanadianWork: boolean;
+  frenchSkills: FrenchBonusTier;
 };
 
 // CRS scoring tables are imported from lib/crs.ts above. The page-level
@@ -57,84 +56,6 @@ function getAgeKey(age: number): string {
   if (age <= 17) return "17_or_less";
   if (age >= 45) return "45_or_more";
   return String(age);
-}
-
-// ─── Skill Transferability ─────────────────────────────────────────────────────
-// Education + language (first lang CLB 7+)
-// Each point level below applies: doctoral=50, masters=50, bachelors=50, 2yr=25, 1yr=25
-// With CLB 9+: doctoral=50, masters=50, bachelors=50, 2yr=50, 1yr=50 (max 50)
-function getEducationPlusLangPoints(
-  education: EducationLevel,
-  firstLangCLB: CLBScores
-): number {
-  const minCLB = Math.min(
-    firstLangCLB.reading,
-    firstLangCLB.writing,
-    firstLangCLB.listening,
-    firstLangCLB.speaking
-  );
-  if (minCLB < 7) return 0;
-
-  const qualifyingEdu: EducationLevel[] = [
-    "one_year_diploma", "two_year_diploma", "bachelors_or_3yr",
-    "two_or_more_certs", "masters", "doctoral",
-  ];
-  if (!qualifyingEdu.includes(education)) return 0;
-
-  const highEdu: EducationLevel[] = ["bachelors_or_3yr", "two_or_more_certs", "masters", "doctoral"];
-  const isHighEdu = highEdu.includes(education);
-
-  if (minCLB >= 9) {
-    return isHighEdu ? 50 : 25;
-  }
-  // CLB 7 or 8
-  return isHighEdu ? 25 : 13;
-}
-
-// Education + Canadian work experience
-function getEducationPlusCanadianWorkPoints(
-  education: EducationLevel,
-  canadianWorkExp: number
-): number {
-  if (canadianWorkExp === 0) return 0;
-  const qualifyingEdu: EducationLevel[] = [
-    "one_year_diploma", "two_year_diploma", "bachelors_or_3yr",
-    "two_or_more_certs", "masters", "doctoral",
-  ];
-  if (!qualifyingEdu.includes(education)) return 0;
-  const highEdu: EducationLevel[] = ["bachelors_or_3yr", "two_or_more_certs", "masters", "doctoral"];
-  const isHighEdu = highEdu.includes(education);
-  if (canadianWorkExp >= 2) return isHighEdu ? 50 : 25;
-  return isHighEdu ? 25 : 13;
-}
-
-// Foreign work + language
-function getForeignWorkPlusLangPoints(
-  foreignWorkExp: number,
-  firstLangCLB: CLBScores
-): number {
-  if (foreignWorkExp === 0) return 0;
-  const minCLB = Math.min(
-    firstLangCLB.reading,
-    firstLangCLB.writing,
-    firstLangCLB.listening,
-    firstLangCLB.speaking
-  );
-  if (minCLB < 7) return 0;
-  if (foreignWorkExp >= 3) return minCLB >= 9 ? 50 : 25;
-  // 1-2 years
-  return minCLB >= 9 ? 25 : 13;
-}
-
-// Foreign work + Canadian work
-function getForeignPlusCanadianWorkPoints(
-  foreignWorkExp: number,
-  canadianWorkExp: number
-): number {
-  if (foreignWorkExp === 0 || canadianWorkExp === 0) return 0;
-  if (foreignWorkExp >= 3 && canadianWorkExp >= 2) return 50;
-  if (foreignWorkExp >= 3 || canadianWorkExp >= 2) return 25;
-  return 13;
 }
 
 // ─── CLB conversion helper text ───────────────────────────────────────────────
@@ -207,37 +128,33 @@ function calcCRS(form: FormState): {
   }
   const spouseFactors = spouseEducationScore + spouseLangScore + spouseWorkScore;
 
-  // ── C. Skill Transferability (max 100 pts) ──
-  const eduLangPts = getEducationPlusLangPoints(form.education, form.firstLangCLB);
-  const eduWorkPts = getEducationPlusCanadianWorkPoints(form.education, form.canadianWorkExp);
-  const foreignLangPts = getForeignWorkPlusLangPoints(form.foreignWorkExp, form.firstLangCLB);
-  const foreignCanadianPts = getForeignPlusCanadianWorkPoints(form.foreignWorkExp, form.canadianWorkExp);
-
-  const skillTransferabilityRaw = eduLangPts + eduWorkPts + foreignLangPts + foreignCanadianPts;
-  const skillTransferability = Math.min(skillTransferabilityRaw, 100);
+  // ── C. Skill Transferability (max 100 pts, with 50-pt sub-caps per group) ──
+  const transfer = computeSkillTransferability({
+    education: form.education,
+    firstLangCLB: form.firstLangCLB,
+    canadianWorkYears: form.canadianWorkExp,
+    foreignWorkYears: form.foreignWorkExp,
+    hasTradesCertificate: form.hasTradesCertificate,
+  });
 
   // ── D. Additional Points ──
   const provincialNominationPts = form.provincialNomination ? 600 : 0;
-  const jobOfferPts =
-    form.jobOfferType === "noc00" ? 200 : form.jobOfferType === "other_noc" ? 50 : 0;
-  const canadianEduPts =
-    form.canadianEducation === "one_two_yr" ? 15 : form.canadianEducation === "three_plus_yr" ? 30 : 0;
+  const jobOfferPts = getJobOfferPoints(form.jobOfferType);
+  const canadianEduPts = getCanadianEducationPoints(form.canadianEducation);
   const siblingPts = form.hasSiblingInCanada ? 15 : 0;
-  let frenchPts = 0;
-  if (form.frenchSkills === "clb7_plus_english_clb4") frenchPts = 15;
-  else if (form.frenchSkills === "clb7_plus_no_english") frenchPts = 30;
+  const frenchPts = getFrenchBonusPoints(form.frenchSkills);
 
   const additionalPoints =
     provincialNominationPts + jobOfferPts + canadianEduPts + siblingPts + frenchPts;
 
-  const total = coreHumanCapital + spouseFactors + skillTransferability + additionalPoints;
+  const total = coreHumanCapital + spouseFactors + transfer.total + additionalPoints;
 
   return {
     total,
     breakdown: {
       coreHumanCapital,
       spouseFactors,
-      skillTransferability,
+      skillTransferability: transfer.total,
       additionalPoints,
       details: {
         age: ageScore,
@@ -248,10 +165,11 @@ function calcCRS(form: FormState): {
         spouseEducation: spouseEducationScore,
         spouseLanguage: spouseLangScore,
         spouseWork: spouseWorkScore,
-        eduPlusLang: eduLangPts,
-        eduPlusWork: eduWorkPts,
-        foreignPlusLang: foreignLangPts,
-        foreignPlusCanadian: foreignCanadianPts,
+        eduPlusLang: transfer.details.eduLang,
+        eduPlusWork: transfer.details.eduWork,
+        foreignPlusLang: transfer.details.foreignLang,
+        foreignPlusCanadian: transfer.details.foreignCanadian,
+        tradesPlusLang: transfer.details.tradesLang,
         provincial: provincialNominationPts,
         jobOffer: jobOfferPts,
         canadianEdu: canadianEduPts,
@@ -278,14 +196,49 @@ const defaultForm: FormState = {
   spouseLangCLB: { reading: 4, writing: 4, listening: 4, speaking: 4 },
   spouseCanadianWorkExp: 0,
   foreignWorkExp: 0,
+  hasTradesCertificate: false,
   provincialNomination: false,
   jobOfferType: "none",
   canadianEducation: "none",
   hasSiblingInCanada: false,
   frenchSkills: "none",
-  educationPlusForeignWork: false,
-  foreignWorkPlusCanadianWork: false,
 };
+
+// Migrate any FormState shape persisted in localStorage from before the
+// 2026-05-09 grid-correctness fixes (French tiers, job offer enum,
+// Canadian-education enum, trades cert field).
+function migrateForm(saved: unknown): FormState {
+  const f = (saved as Record<string, unknown>) ?? {};
+  const legacyFrench = f.frenchSkills as string | undefined;
+  const frenchSkills: FrenchBonusTier =
+    legacyFrench === "clb7_plus_english_clb4" ? "clb7_french_low_english" :
+    legacyFrench === "clb7_plus_no_english"   ? "clb7_french_low_english" :
+    (["none", "clb7_french_low_english", "clb7_french_strong_english"].includes(legacyFrench ?? "")
+      ? (legacyFrench as FrenchBonusTier)
+      : "none");
+  const legacyJob = f.jobOfferType as string | undefined;
+  const jobOfferType: JobOfferTier =
+    legacyJob === "noc00"     ? "noc_teer_0_major_00" :
+    legacyJob === "other_noc" ? "noc_teer_0_1_2_3" :
+    (["none", "noc_teer_0_major_00", "noc_teer_0_1_2_3"].includes(legacyJob ?? "")
+      ? (legacyJob as JobOfferTier)
+      : "none");
+  const legacyEdu = f.canadianEducation as string | undefined;
+  const canadianEducation: CanadianEducationTier =
+    legacyEdu === "one_two_yr"     ? "one_or_two_year" :
+    legacyEdu === "three_plus_yr"  ? "three_year_plus" :
+    (["none", "one_or_two_year", "three_year_plus"].includes(legacyEdu ?? "")
+      ? (legacyEdu as CanadianEducationTier)
+      : "none");
+  return {
+    ...defaultForm,
+    ...(f as Partial<FormState>),
+    frenchSkills,
+    jobOfferType,
+    canadianEducation,
+    hasTradesCertificate: Boolean(f.hasTradesCertificate),
+  };
+}
 
 // ─── Sub-components (inline) ─────────────────────────────────────────────────
 
@@ -419,7 +372,7 @@ export default function CRSCalculatorPage() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("crs_form_v2");
-      if (saved) setForm(JSON.parse(saved));
+      if (saved) setForm(migrateForm(JSON.parse(saved)));
     } catch {}
   }, []);
 
@@ -685,6 +638,14 @@ export default function CRSCalculatorPage() {
                 </select>
               </div>
 
+              <div className="pt-2">
+                <Toggle
+                  checked={form.hasTradesCertificate}
+                  onChange={(v) => set("hasTradesCertificate", v)}
+                  label="I hold a Canadian provincial Certificate of Qualification in a skilled trade"
+                />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div className="canada-card p-3 space-y-1">
                   <p className="text-xs text-gray-400 uppercase tracking-wide">Education + Language</p>
@@ -710,7 +671,17 @@ export default function CRSCalculatorPage() {
                   <p className="text-2xl font-bold text-white">{breakdown.details.foreignPlusCanadian}</p>
                   <p className="text-xs text-gray-500">Foreign work exp + Canadian work exp</p>
                 </div>
+                {form.hasTradesCertificate && (
+                  <div className="canada-card p-3 space-y-1 sm:col-span-2">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Trades Certificate + Language</p>
+                    <p className="text-2xl font-bold text-white">{breakdown.details.tradesPlusLang}</p>
+                    <p className="text-xs text-gray-500">CLB 5+ → 25 pts, CLB 7+ → 50 pts</p>
+                  </div>
+                )}
               </div>
+              <p className="text-xs text-gray-600 pt-2">
+                Each group (education, foreign work, trades) caps at 50 pts. Overall total caps at 100 pts.
+              </p>
             </SectionCard>
 
             {/* Additional Points */}
@@ -731,16 +702,16 @@ export default function CRSCalculatorPage() {
 
               {/* Job Offer */}
               <div>
-                <Label>Valid Job Offer</Label>
+                <Label>Valid Job Offer (must be supported by an LMIA, where required)</Label>
                 <div className="flex flex-wrap gap-2">
-                  {[
+                  {([
                     { val: "none", label: "No job offer", pts: "0 pts" },
-                    { val: "noc00", label: "NOC TEER 0 (senior mgmt)", pts: "+200 pts" },
-                    { val: "other_noc", label: "Other valid NOC", pts: "+50 pts" },
-                  ].map(({ val, label, pts }) => (
+                    { val: "noc_teer_0_major_00", label: "NOC TEER 0 — Major Group 00 (senior mgmt: CEO, CFO, GM)", pts: "+200 pts" },
+                    { val: "noc_teer_0_1_2_3", label: "Other valid NOC TEER 0, 1, 2, or 3", pts: "+50 pts" },
+                  ] as const).map(({ val, label, pts }) => (
                     <button
                       key={val}
-                      onClick={() => set("jobOfferType", val as FormState["jobOfferType"])}
+                      onClick={() => set("jobOfferType", val)}
                       className={`canada-pill ${form.jobOfferType === val ? "active" : ""} text-xs`}
                     >
                       {label}
@@ -748,20 +719,24 @@ export default function CRSCalculatorPage() {
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-gray-600 mt-1">
+                  The 200-pt bonus only applies to NOC Major Group 00 (senior management roles).
+                  Most TEER 0 positions (other managers) qualify for the 50-pt bonus.
+                </p>
               </div>
 
               {/* Canadian Education */}
               <div>
                 <Label>Canadian Education (studied in Canada)</Label>
                 <div className="flex flex-wrap gap-2">
-                  {[
+                  {([
                     { val: "none", label: "None", pts: "0 pts" },
-                    { val: "one_two_yr", label: "1–2 year program", pts: "+15 pts" },
-                    { val: "three_plus_yr", label: "3+ year program", pts: "+30 pts" },
-                  ].map(({ val, label, pts }) => (
+                    { val: "one_or_two_year", label: "1–2 year program", pts: "+15 pts" },
+                    { val: "three_year_plus", label: "3+ year program", pts: "+30 pts" },
+                  ] as const).map(({ val, label, pts }) => (
                     <button
                       key={val}
-                      onClick={() => set("canadianEducation", val as FormState["canadianEducation"])}
+                      onClick={() => set("canadianEducation", val)}
                       className={`canada-pill ${form.canadianEducation === val ? "active" : ""} text-xs`}
                     >
                       {label}
@@ -786,16 +761,16 @@ export default function CRSCalculatorPage() {
 
               {/* French */}
               <div>
-                <Label>French Language Skills</Label>
+                <Label>French Language Skills (NCLC 7+ in all four French abilities)</Label>
                 <div className="flex flex-wrap gap-2">
-                  {[
-                    { val: "none", label: "No French / below CLB 7", pts: "0 pts" },
-                    { val: "clb7_plus_english_clb4", label: "CLB 7+ French + strong English", pts: "+15 pts" },
-                    { val: "clb7_plus_no_english", label: "CLB 7+ French only (no strong English)", pts: "+30 pts" },
-                  ].map(({ val, label, pts }) => (
+                  {([
+                    { val: "none", label: "No French / below NCLC 7 in any skill", pts: "0 pts" },
+                    { val: "clb7_french_low_english", label: "NCLC 7+ French + English CLB 4 or below (or no English)", pts: "+25 pts" },
+                    { val: "clb7_french_strong_english", label: "NCLC 7+ French + English CLB 5+ in all 4 skills", pts: "+50 pts" },
+                  ] as const).map(({ val, label, pts }) => (
                     <button
                       key={val}
-                      onClick={() => set("frenchSkills", val as FormState["frenchSkills"])}
+                      onClick={() => set("frenchSkills", val)}
                       className={`canada-pill ${form.frenchSkills === val ? "active" : ""} text-xs`}
                     >
                       {label}
@@ -803,6 +778,10 @@ export default function CRSCalculatorPage() {
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-gray-600 mt-1">
+                  Per IRCC&apos;s Oct 2022 update — strong bilingual candidates (French + English) get
+                  the full 50-pt bonus.
+                </p>
               </div>
             </SectionCard>
           </div>
