@@ -20,7 +20,25 @@ export type EducationLevel =
   | "masters"
   | "doctoral";
 
-export type LangTest = "ielts" | "celpip";
+export type LangTest = "ielts" | "celpip" | "tef" | "tcf";
+
+/** Which official language a given language block represents. */
+export type OfficialLanguage = "english" | "french";
+
+/** IRCC pairs each test with one official language. Used to validate the form. */
+export const TEST_LANGUAGE: Record<LangTest, OfficialLanguage> = {
+  ielts: "english",
+  celpip: "english",
+  tef: "french",
+  tcf: "french",
+};
+
+export const TEST_LABEL: Record<LangTest, string> = {
+  ielts: "IELTS General Training",
+  celpip: "CELPIP-General",
+  tef: "TEF Canada",
+  tcf: "TCF Canada",
+};
 
 export type Skill = "listening" | "reading" | "writing" | "speaking";
 
@@ -153,11 +171,11 @@ export function getSpouseCanadianWorkPoints(years: number): number {
   return SPOUSE_CANADIAN_WORK_POINTS[clamped] ?? 0;
 }
 
-// ─── IELTS / CELPIP → CLB conversion ────────────────────────────────────────
-// IRCC's official equivalency for IELTS General Training is per-skill — the
-// thresholds for Listening, Reading, Writing, and Speaking are different from
-// each other, so the same band score maps to different CLB values depending
-// on which skill it belongs to. CELPIP is already on the CLB scale.
+// ─── IELTS / CELPIP / TEF / TCF → CLB conversion ────────────────────────────
+// IRCC publishes per-skill equivalency charts because each test scores each
+// skill on a different scale. A single threshold per test is wrong — e.g. an
+// IELTS 7.0 maps to CLB 9 in Reading but only CLB 7 in Listening. /clb,
+// /crs, and /dashboard all share these tables so they can never drift.
 
 const IELTS_GT_TO_CLB: Record<Skill, ReadonlyArray<{ min: number; clb: number }>> = {
   // Each table is sorted highest → lowest; first match wins.
@@ -183,13 +201,124 @@ const IELTS_GT_TO_CLB: Record<Skill, ReadonlyArray<{ min: number; clb: number }>
   ],
 };
 
+// TEF Canada — score ranges differ per skill: L 0–360, R 0–300, W 0–450, S 0–450.
+const TEF_TO_CLB: Record<Skill, ReadonlyArray<{ min: number; clb: number }>> = {
+  listening: [
+    { min: 316, clb: 10 }, { min: 298, clb: 9 }, { min: 280, clb: 8 },
+    { min: 249, clb: 7 },  { min: 217, clb: 6 }, { min: 181, clb: 5 },
+    { min: 145, clb: 4 },
+  ],
+  reading: [
+    { min: 263, clb: 10 }, { min: 248, clb: 9 }, { min: 233, clb: 8 },
+    { min: 207, clb: 7 },  { min: 181, clb: 6 }, { min: 151, clb: 5 },
+    { min: 121, clb: 4 },
+  ],
+  writing: [
+    { min: 393, clb: 10 }, { min: 371, clb: 9 }, { min: 349, clb: 8 },
+    { min: 310, clb: 7 },  { min: 271, clb: 6 }, { min: 226, clb: 5 },
+    { min: 181, clb: 4 },
+  ],
+  speaking: [
+    { min: 393, clb: 10 }, { min: 371, clb: 9 }, { min: 349, clb: 8 },
+    { min: 310, clb: 7 },  { min: 271, clb: 6 }, { min: 226, clb: 5 },
+    { min: 181, clb: 4 },
+  ],
+};
+
+// TCF Canada — L/R 100–699, W/S 1–20.
+const TCF_TO_CLB: Record<Skill, ReadonlyArray<{ min: number; clb: number }>> = {
+  listening: [
+    { min: 549, clb: 10 }, { min: 523, clb: 9 }, { min: 503, clb: 8 },
+    { min: 458, clb: 7 },  { min: 398, clb: 6 }, { min: 369, clb: 5 },
+    { min: 331, clb: 4 },
+  ],
+  reading: [
+    { min: 549, clb: 10 }, { min: 524, clb: 9 }, { min: 499, clb: 8 },
+    { min: 453, clb: 7 },  { min: 406, clb: 6 }, { min: 375, clb: 5 },
+    { min: 342, clb: 4 },
+  ],
+  writing: [
+    { min: 16, clb: 10 }, { min: 14, clb: 9 }, { min: 12, clb: 8 },
+    { min: 10, clb: 7 },  { min: 7, clb: 6 },  { min: 6, clb: 5 },
+    { min: 4, clb: 4 },
+  ],
+  speaking: [
+    { min: 16, clb: 10 }, { min: 14, clb: 9 }, { min: 12, clb: 8 },
+    { min: 10, clb: 7 },  { min: 7, clb: 6 },  { min: 6, clb: 5 },
+    { min: 4, clb: 4 },
+  ],
+};
+
+const PER_SKILL_TABLES: Partial<Record<LangTest, Record<Skill, ReadonlyArray<{ min: number; clb: number }>>>> = {
+  ielts: IELTS_GT_TO_CLB,
+  tef: TEF_TO_CLB,
+  tcf: TCF_TO_CLB,
+};
+
+/**
+ * Returns the per-skill minimum-raw-score table for a given test (sorted
+ * highest CLB first). Used by /clb to render the equivalency table without
+ * duplicating the data.
+ */
+export function getTestThresholds(
+  test: LangTest,
+): Record<Skill, ReadonlyArray<{ min: number; clb: number }>> | null {
+  return PER_SKILL_TABLES[test] ?? null;
+}
+
+/** All CLB levels we score, highest first. */
+export const CLB_LEVELS = [10, 9, 8, 7, 6, 5, 4] as const;
+
 export function rawScoreToClb(raw: number, test: LangTest, skill: Skill): number {
-  if (test === "celpip") return Math.min(10, Math.max(1, Math.round(raw)));
-  for (const { min, clb } of IELTS_GT_TO_CLB[skill]) {
+  if (Number.isNaN(raw)) return 0;
+  if (test === "celpip") return Math.min(10, Math.max(0, Math.round(raw)));
+  const table = PER_SKILL_TABLES[test];
+  if (!table) return 0;
+  for (const { min, clb } of table[skill]) {
     if (raw >= min) return clb;
   }
   return 0;
 }
+
+/** Sensible per-test, per-skill default raw scores for the input UI. */
+export const TEST_DEFAULTS: Record<LangTest, Record<Skill, number>> = {
+  ielts:  { listening: 6.0, reading: 6.0, writing: 6.0, speaking: 6.0 },
+  celpip: { listening: 7,   reading: 7,   writing: 7,   speaking: 7 },
+  tef:    { listening: 249, reading: 207, writing: 310, speaking: 310 },
+  tcf:    { listening: 458, reading: 453, writing: 10,  speaking: 10 },
+};
+
+/** Allowed raw-score values per test for the dropdowns (sorted high → low). */
+export const TEST_SCORE_OPTIONS: Record<LangTest, Record<Skill, number[]>> = {
+  ielts: {
+    listening: [9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5, 5.0, 4.5],
+    reading:   [9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5, 5.0, 4.5, 4.0, 3.5],
+    writing:   [9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5, 5.0, 4.5, 4.0],
+    speaking:  [9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5, 5.0, 4.5, 4.0],
+  },
+  celpip: {
+    // CELPIP officially scores 1–12 but CRS caps at CLB 10, so we cap the
+    // visible options at 10 to avoid the "I picked 12, why is my score the
+    // same as 10?" confusion.
+    listening: [10, 9, 8, 7, 6, 5, 4, 3],
+    reading:   [10, 9, 8, 7, 6, 5, 4, 3],
+    writing:   [10, 9, 8, 7, 6, 5, 4, 3],
+    speaking:  [10, 9, 8, 7, 6, 5, 4, 3],
+  },
+  tef: {
+    // Show the CLB-threshold values so users see exactly the band they need.
+    listening: [316, 298, 280, 249, 217, 181, 145],
+    reading:   [263, 248, 233, 207, 181, 151, 121],
+    writing:   [393, 371, 349, 310, 271, 226, 181],
+    speaking:  [393, 371, 349, 310, 271, 226, 181],
+  },
+  tcf: {
+    listening: [549, 523, 503, 458, 398, 369, 331],
+    reading:   [549, 524, 499, 453, 406, 375, 342],
+    writing:   [16, 14, 12, 10, 7, 6, 4],
+    speaking:  [16, 14, 12, 10, 7, 6, 4],
+  },
+};
 
 // ─── Re-exports for back-compat with /crs's record-based lookups ─────────────
 // These keep the /crs UI tables (which iterate over { CLB → points } entries
@@ -366,6 +495,27 @@ export function getFrenchBonusPoints(tier: FrenchBonusTier): number {
   if (tier === "clb7_french_strong_english") return 50;
   if (tier === "clb7_french_low_english") return 25;
   return 0;
+}
+
+/**
+ * Auto-derive the French bonus tier from a candidate's English + French CLB
+ * scores. Lets the form drop the manual French-tier picker — the user enters
+ * each language's scores once and we figure out which tier they qualify for.
+ *
+ * Pass `null` (or undefined) when the candidate doesn't have scores for that
+ * language at all (very different from "they tried but failed CLB 7").
+ */
+export function deriveFrenchBonusTier(
+  englishCLB: CLBScores | null | undefined,
+  frenchCLB: CLBScores | null | undefined,
+): FrenchBonusTier {
+  if (!frenchCLB) return "none";
+  if (minClb(frenchCLB) < 7) return "none";
+  // Bonus requires NCLC 7+ in ALL FOUR French skills, which we just confirmed.
+  if (englishCLB && minClb(englishCLB) >= 5) {
+    return "clb7_french_strong_english";
+  }
+  return "clb7_french_low_english";
 }
 
 export type JobOfferTier =
