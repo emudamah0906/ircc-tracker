@@ -257,6 +257,130 @@ function deriveFrenchTierFromForm(form: FormState): FrenchBonusTier {
   return deriveFrenchBonusTier(eng ? eng.clb : null, fre ? fre.clb : null);
 }
 
+/**
+ * Generate actionable improvement tips ordered by point delta.
+ *
+ * Every tip is computed by simulating a focused change to the form and
+ * re-scoring — so the "+X pts" we display is exactly what the user will see
+ * if they make that change. No hardcoded estimates that drift from the
+ * scoring grid.
+ */
+type CrsTip = { id: string; text: string; gain: number };
+function getCrsTips(form: FormState, currentTotal: number): CrsTip[] {
+  const withChange = (patch: Partial<FormState>): number =>
+    calcCRS({ ...form, ...patch }).total;
+
+  const tips: CrsTip[] = [];
+  const minFirstClb = Math.min(
+    form.firstLang.clb.reading,
+    form.firstLang.clb.writing,
+    form.firstLang.clb.listening,
+    form.firstLang.clb.speaking,
+  );
+
+  // ── Provincial Nomination — biggest single lever ──
+  if (!form.provincialNomination) {
+    const gain = withChange({ provincialNomination: true }) - currentTotal;
+    if (gain > 0) tips.push({
+      id: "pnp",
+      text: "🏆 Apply to a Provincial Nominee Program (PNP) — OINP, BC PNP, AAIP, and category-based streams unlock the biggest single jump on the grid.",
+      gain,
+    });
+  }
+
+  // ── Push first-lang to CLB 9 in every skill (unlocks transferability + max core) ──
+  if (minFirstClb < 9) {
+    const boostedClb = {
+      reading:   Math.max(form.firstLang.clb.reading, 9),
+      writing:   Math.max(form.firstLang.clb.writing, 9),
+      listening: Math.max(form.firstLang.clb.listening, 9),
+      speaking:  Math.max(form.firstLang.clb.speaking, 9),
+    };
+    const gain = withChange({
+      firstLang: { ...form.firstLang, inputMode: "clb", clb: boostedClb },
+    }) - currentTotal;
+    if (gain > 0) tips.push({
+      id: "clb9",
+      text: `🗣 Reach CLB 9 in every first-language skill (your weakest is currently CLB ${minFirstClb}). Doubles many transferability sub-scores.`,
+      gain,
+    });
+  }
+
+  // ── Canadian work experience tiers ──
+  if (form.canadianWorkExp === 0) {
+    const gain = withChange({ canadianWorkExp: 1 }) - currentTotal;
+    if (gain > 0) tips.push({
+      id: "canwork-1",
+      text: "🇨🇦 1 year of Canadian work experience — easiest path is the post-graduation work permit (PGWP).",
+      gain,
+    });
+  } else if (form.canadianWorkExp === 1) {
+    const gain = withChange({ canadianWorkExp: 2 }) - currentTotal;
+    if (gain > 0) tips.push({
+      id: "canwork-2",
+      text: "🇨🇦 Push Canadian work experience to 2 years to unlock the higher transferability tier.",
+      gain,
+    });
+  }
+
+  // ── French bilingual bonus ──
+  const hasFrench = form.firstLang.language === "french"
+    || (form.hasSecondLang && form.secondLang.language === "french");
+  if (!hasFrench) {
+    // Simulate adding a CLB 7 French second-language block.
+    const frenchSecond = makeLangBlock("french", "tef", 7);
+    const gain = withChange({ hasSecondLang: true, secondLang: frenchSecond }) - currentTotal;
+    if (gain > 0) tips.push({
+      id: "french",
+      text: "🇫🇷 NCLC 7+ in French (TEF or TCF Canada) unlocks the +25 / +50 bilingual bonus — the fastest path for English-strong candidates.",
+      gain,
+    });
+  }
+
+  // ── Job offer ──
+  if (form.jobOfferType === "none") {
+    const gain = withChange({ jobOfferType: "noc_teer_0_1_2_3" }) - currentTotal;
+    if (gain > 0) tips.push({
+      id: "joboffer",
+      text: "💼 A qualifying NOC TEER 0/1/2/3 job offer adds +50 (or +200 if it's NOC Major Group 00 senior management).",
+      gain,
+    });
+  }
+
+  // ── Foreign work + Canadian work transferability boost ──
+  if (form.foreignWorkExp === 0) {
+    const gain = withChange({ foreignWorkExp: 1 }) - currentTotal;
+    if (gain > 0) tips.push({
+      id: "foreignwork",
+      text: "🌍 Even 1–2 years of foreign work experience pairs with your Canadian work / language to add transferability points.",
+      gain,
+    });
+  }
+
+  // ── Trades certificate (only meaningful if not already toggled) ──
+  if (!form.hasTradesCertificate) {
+    const gain = withChange({ hasTradesCertificate: true }) - currentTotal;
+    if (gain > 0) tips.push({
+      id: "trades",
+      text: "🔧 Hold a Canadian provincial Certificate of Qualification in a skilled trade? Toggle it on — adds 25–50 transferability points.",
+      gain,
+    });
+  }
+
+  // ── Sibling in Canada ──
+  if (!form.hasSiblingInCanada) {
+    const gain = withChange({ hasSiblingInCanada: true }) - currentTotal;
+    if (gain > 0) tips.push({
+      id: "sibling",
+      text: "👨‍👩‍👧 A sibling who is a Canadian citizen or PR adds +15 — easy to forget but worth claiming if it applies.",
+      gain,
+    });
+  }
+
+  tips.sort((a, b) => b.gain - a.gain);
+  return tips.filter((t) => t.gain > 0).slice(0, 5);
+}
+
 // ─── Default form state ───────────────────────────────────────────────────────
 
 const defaultForm: FormState = {
@@ -672,6 +796,7 @@ export default function CRSCalculatorPage() {
 
   const result = useMemo(() => calcCRS(form), [form]);
   const { total, breakdown } = result;
+  const tips = useMemo(() => getCrsTips(form, total), [form, total]);
 
   const latestCutoff = recentDraws[0]?.score ?? 477;
   const pointsNeeded = Math.max(0, latestCutoff - total);
@@ -1212,6 +1337,32 @@ export default function CRSCalculatorPage() {
                   </div>
                   <p className="text-xs text-gray-600 mt-3">
                     Green = your score qualifies · Red = below cutoff
+                  </p>
+                </div>
+              )}
+
+              {/* What to fix next — actionable tips ordered by point delta */}
+              {tips.length > 0 && (
+                <div className="canada-card p-4 space-y-2 ring-1 ring-yellow-700/30">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs uppercase tracking-widest text-yellow-400">
+                      What would boost your score
+                    </p>
+                    <span className="text-[10px] text-gray-600">live what-if</span>
+                  </div>
+                  <ul className="space-y-2">
+                    {tips.map((t) => (
+                      <li key={t.id} className="flex items-start gap-3 text-xs text-gray-300">
+                        <span className="text-green-400 font-bold whitespace-nowrap font-mono shrink-0 pt-0.5">
+                          +{t.gain}
+                        </span>
+                        <span className="leading-snug">{t.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[10px] text-gray-600 pt-1 border-t border-white/5">
+                    Each &quot;+X&quot; is the actual jump you&apos;d see if you made that change today —
+                    re-computed live from the IRCC grid, not a hardcoded estimate.
                   </p>
                 </div>
               )}

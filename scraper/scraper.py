@@ -144,7 +144,17 @@ def main():
 
     insert_to_supabase(rows)
     print("Done.")
+    return len(rows)
 
 
 if __name__ == "__main__":
-    main()
+    # Local import keeps the rest of the file usable without health.py
+    from health import report_success, report_failure
+    import sys
+    try:
+        n = main() or 0
+        report_success("processing_times", metadata={"rows_inserted": n})
+    except Exception as exc:
+        print(f"[processing_times] ERROR: {exc}", file=sys.stderr)
+        report_failure("processing_times", error=str(exc))
+        sys.exit(1)

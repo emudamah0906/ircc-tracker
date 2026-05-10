@@ -54,6 +54,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
+          set -e
           echo "Invoking fetch-ircc-news edge function..."
           status_and_body=$(curl -s -w "\nHTTP_STATUS:%{http_code}\n" \
             -X POST \
@@ -62,12 +63,62 @@ jobs:
             -d '{}' \
             "${SUPABASE_URL}/functions/v1/fetch-ircc-news")
           echo "$status_and_body"
-          # Fail the step if the HTTP status wasn't 2xx
           status=$(echo "$status_and_body" | grep -oE 'HTTP_STATUS:[0-9]+' | tail -1 | cut -d: -f2)
+          ts=$(date -u +%FT%TZ)
           if [ -z "$status" ] || [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
-            echo "News fetch failed with status: $status"
+            echo "::error::News fetch failed with status: $status"
+            # Report failure to scraper_health so the IG worker sees it.
+            curl -s -X POST \
+              -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: resolution=merge-duplicates,return=minimal" \
+              -d "{\"scraper_name\":\"ircc_news\",\"last_attempt_at\":\"${ts}\",\"last_status\":\"failed\",\"last_error\":\"edge function HTTP ${status}\",\"last_run_id\":\"${GITHUB_RUN_ID}\",\"updated_at\":\"${ts}\"}" \
+              "${SUPABASE_URL}/rest/v1/scraper_health?on_conflict=scraper_name" || true
             exit 1
           fi
+          # Report success
+          curl -s -X POST \
+            -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates,return=minimal" \
+            -d "{\"scraper_name\":\"ircc_news\",\"last_attempt_at\":\"${ts}\",\"last_success_at\":\"${ts}\",\"last_status\":\"success\",\"last_error\":null,\"last_run_id\":\"${GITHUB_RUN_ID}\",\"updated_at\":\"${ts}\"}" \
+            "${SUPABASE_URL}/rest/v1/scraper_health?on_conflict=scraper_name" || true
+
+      # Catch-all: if any step above failed (including a Python crash
+      # that happened BEFORE the per-scraper health.report_failure call
+      # could fire — e.g. import error, missing env), record a workflow-level
+      # failure so the IG worker is aware that this run did not complete.
+      - name: Report workflow-level failure
+        if: failure()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          ts=$(date -u +%FT%TZ)
+          curl -s -X POST \
+            -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates,return=minimal" \
+            -d "{\"scraper_name\":\"workflow\",\"last_attempt_at\":\"${ts}\",\"last_status\":\"failed\",\"last_error\":\"GH Actions run ${GITHUB_RUN_ID} failed — see logs\",\"last_run_id\":\"${GITHUB_RUN_ID}\",\"updated_at\":\"${ts}\"}" \
+            "${SUPABASE_URL}/rest/v1/scraper_health?on_conflict=scraper_name" || true
+
+      - name: Report workflow-level success
+        if: success()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          ts=$(date -u +%FT%TZ)
+          curl -s -X POST \
+            -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates,return=minimal" \
+            -d "{\"scraper_name\":\"workflow\",\"last_attempt_at\":\"${ts}\",\"last_success_at\":\"${ts}\",\"last_status\":\"success\",\"last_error\":null,\"last_run_id\":\"${GITHUB_RUN_ID}\",\"updated_at\":\"${ts}\"}" \
+            "${SUPABASE_URL}/rest/v1/scraper_health?on_conflict=scraper_name" || true
 
       # Sanity check on processing_times only.
       #
