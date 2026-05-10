@@ -14,53 +14,100 @@ import {
   getSpouseLangPoints,
   getSpouseCanadianWorkPoints,
   computeSkillTransferability,
+  getJobOfferPoints,
+  getCanadianEducationPoints,
+  getFrenchBonusPoints,
+  deriveFrenchBonusTier,
   rawScoreToClb,
+  TEST_DEFAULTS,
+  TEST_LABEL,
+  TEST_LANGUAGE,
+  TEST_SCORE_OPTIONS,
   type CLBScores,
   type EducationLevel,
   type LangTest,
+  type OfficialLanguage,
   type Skill,
+  type JobOfferTier,
+  type CanadianEducationTier,
 } from "@/lib/crs";
 
 type Profile = {
   age: number;
   marital_status: "single" | "married";
   education: EducationLevel;
-  lang_test: LangTest;
+
+  // ── Applicant first official language ──
+  first_lang_test: LangTest;            // ielts/celpip/tef/tcf
+  first_lang_choice: OfficialLanguage;  // english/french
   first_lang_reading: number;
   first_lang_writing: number;
   first_lang_listening: number;
   first_lang_speaking: number;
+
+  // ── Optional French block (only if candidate has French alongside English) ──
+  has_french_lang: boolean;
+  french_lang_test: LangTest;           // typically tef or tcf
+  french_lang_reading: number;
+  french_lang_writing: number;
+  french_lang_listening: number;
+  french_lang_speaking: number;
+
   canada_work_years: number;
   foreign_work_years: number;
-  has_canadian_education: boolean;
+
+  // ── Tiered additional-points (replaces boolean has_job_offer/has_canadian_education) ──
+  job_offer_tier: JobOfferTier;
+  canadian_education_tier: CanadianEducationTier;
   has_provincial_nomination: boolean;
-  has_job_offer: boolean;
   has_canadian_sibling: boolean;
-  // Spouse
+
+  // ── Spouse ──
   spouse_education: EducationLevel;
+  spouse_lang_test: LangTest;
+  spouse_lang_choice: OfficialLanguage;
   spouse_lang_reading: number;
   spouse_lang_writing: number;
   spouse_lang_listening: number;
   spouse_lang_speaking: number;
   spouse_canada_work_years: number;
+
+  // ── Legacy fields kept ONLY for backwards-compat read from old saved rows ──
+  /** @deprecated use first_lang_test */ lang_test?: LangTest;
+  /** @deprecated use job_offer_tier */ has_job_offer?: boolean;
+  /** @deprecated use canadian_education_tier */ has_canadian_education?: boolean;
 };
 
 const DEFAULT_PROFILE: Profile = {
   age: 28,
   marital_status: "single",
   education: "bachelors_or_3yr",
-  lang_test: "ielts",
+
+  first_lang_test: "ielts",
+  first_lang_choice: "english",
   first_lang_reading: 7,
   first_lang_writing: 7,
   first_lang_listening: 7,
   first_lang_speaking: 7,
+
+  has_french_lang: false,
+  french_lang_test: "tef",
+  french_lang_reading: TEST_DEFAULTS.tef.reading,
+  french_lang_writing: TEST_DEFAULTS.tef.writing,
+  french_lang_listening: TEST_DEFAULTS.tef.listening,
+  french_lang_speaking: TEST_DEFAULTS.tef.speaking,
+
   canada_work_years: 0,
   foreign_work_years: 1,
-  has_canadian_education: false,
+
+  job_offer_tier: "none",
+  canadian_education_tier: "none",
   has_provincial_nomination: false,
-  has_job_offer: false,
   has_canadian_sibling: false,
+
   spouse_education: "bachelors_or_3yr",
+  spouse_lang_test: "ielts",
+  spouse_lang_choice: "english",
   spouse_lang_reading: 5,
   spouse_lang_writing: 5,
   spouse_lang_listening: 5,
@@ -78,6 +125,43 @@ function normalizeEducation(value: string | undefined | null): EducationLevel {
   return (valid.includes(value as EducationLevel) ? value : "bachelors_or_3yr") as EducationLevel;
 }
 
+/**
+ * Backfill the new schema fields from old saved rows on read. Without this,
+ * pre-2026-05-09 profiles would lose their job-offer / Canadian-education
+ * indicators after the schema upgrade.
+ */
+function normalizeProfile(raw: Partial<Profile>): Profile {
+  const out: Profile = { ...DEFAULT_PROFILE, ...(raw as Profile) };
+  out.education = normalizeEducation(out.education);
+  out.spouse_education = normalizeEducation(out.spouse_education);
+
+  // Legacy lang_test → first_lang_test + spouse_lang_test
+  if (raw.lang_test && !raw.first_lang_test) out.first_lang_test = raw.lang_test;
+  if (raw.lang_test && !raw.spouse_lang_test) out.spouse_lang_test = raw.lang_test;
+
+  // Legacy has_job_offer → job_offer_tier (we can't infer the major-00 tier
+  // from a boolean, so default to the +50 "other valid NOC" tier)
+  if (raw.has_job_offer && !raw.job_offer_tier) out.job_offer_tier = "noc_teer_0_1_2_3";
+  if (!out.job_offer_tier) out.job_offer_tier = "none";
+
+  // Legacy has_canadian_education → canadian_education_tier (default to +15)
+  if (raw.has_canadian_education && !raw.canadian_education_tier) {
+    out.canadian_education_tier = "one_or_two_year";
+  }
+  if (!out.canadian_education_tier) out.canadian_education_tier = "none";
+
+  // Validate language enums
+  const validTests: LangTest[] = ["ielts", "celpip", "tef", "tcf"];
+  if (!validTests.includes(out.first_lang_test)) out.first_lang_test = "ielts";
+  if (!validTests.includes(out.spouse_lang_test)) out.spouse_lang_test = "ielts";
+  if (!validTests.includes(out.french_lang_test)) out.french_lang_test = "tef";
+
+  if (out.first_lang_choice !== "french") out.first_lang_choice = "english";
+  if (out.spouse_lang_choice !== "french") out.spouse_lang_choice = "english";
+
+  return out;
+}
+
 // ── CRS Calculation — shape adapter that wraps lib/crs helpers ────────────────
 /**
  * Wraps the saved Profile shape and calls the canonical helpers in lib/crs.ts.
@@ -86,17 +170,36 @@ function normalizeEducation(value: string | undefined | null): EducationLevel {
  * education / French (no granular tier), so the dashboard awards the lower
  * tier in those cases. The /crs page captures full granularity.
  */
+/** Build CLBScores for one block by converting raw test scores via the centralized table. */
+function blockToClb(
+  test: LangTest,
+  reading: number, writing: number, listening: number, speaking: number,
+): CLBScores {
+  return {
+    reading:   rawScoreToClb(reading,   test, "reading"),
+    writing:   rawScoreToClb(writing,   test, "writing"),
+    listening: rawScoreToClb(listening, test, "listening"),
+    speaking:  rawScoreToClb(speaking,  test, "speaking"),
+  };
+}
+
 function calcCRS(p: Profile): { total: number; breakdown: Record<string, number> } {
   const hasSpouse = p.marital_status === "married";
   const breakdown: Record<string, number> = {};
 
-  // ── First-language CLB (per-skill IELTS GT or CELPIP passthrough) ──
-  const firstLangCLB: CLBScores = {
-    reading: rawScoreToClb(p.first_lang_reading, p.lang_test, "reading"),
-    writing: rawScoreToClb(p.first_lang_writing, p.lang_test, "writing"),
-    listening: rawScoreToClb(p.first_lang_listening, p.lang_test, "listening"),
-    speaking: rawScoreToClb(p.first_lang_speaking, p.lang_test, "speaking"),
-  };
+  // ── First-language CLB ──
+  const firstLangCLB: CLBScores = blockToClb(
+    p.first_lang_test,
+    p.first_lang_reading, p.first_lang_writing,
+    p.first_lang_listening, p.first_lang_speaking,
+  );
+
+  // ── Optional French block CLB ──
+  const frenchCLB: CLBScores | null = p.has_french_lang ? blockToClb(
+    p.french_lang_test,
+    p.french_lang_reading, p.french_lang_writing,
+    p.french_lang_listening, p.french_lang_speaking,
+  ) : null;
 
   // ── A: Core human capital ──
   breakdown.age = getAgePoints(p.age, hasSpouse);
@@ -106,40 +209,83 @@ function calcCRS(p: Profile): { total: number; breakdown: Record<string, number>
     getFirstLangPoints(firstLangCLB.writing, hasSpouse) +
     getFirstLangPoints(firstLangCLB.listening, hasSpouse) +
     getFirstLangPoints(firstLangCLB.speaking, hasSpouse);
+
+  // Second-language points (capped at 24) — applies when the candidate has
+  // a French block. The "second" language is whichever of the two isn't
+  // their first.
+  let secondLangScore = 0;
+  if (frenchCLB) {
+    if (p.first_lang_choice === "english") {
+      // English is first, French is second
+      secondLangScore = Math.min(24,
+        getSpouseLangPoints(frenchCLB.reading) + // SECOND_LANG = SPOUSE_LANG table (same per-skill values)
+        getSpouseLangPoints(frenchCLB.writing) +
+        getSpouseLangPoints(frenchCLB.listening) +
+        getSpouseLangPoints(frenchCLB.speaking),
+      );
+    } else {
+      // French is first, English would be second — but we don't have a
+      // separate English block in this case (English IS the first), so 0.
+      // (When the applicant's primary test is French, they should put the
+      // English block as the "first" to get richer scoring — explained in UI.)
+      secondLangScore = 0;
+    }
+  }
+  breakdown.secondLanguage = secondLangScore;
+  breakdown.language += secondLangScore;
+
   breakdown.canadaWork = getCanadianWorkPoints(p.canada_work_years, hasSpouse);
 
   // ── B: Spouse factors ──
   breakdown.spouse = 0;
   if (hasSpouse) {
+    const spouseCLB = blockToClb(
+      p.spouse_lang_test,
+      p.spouse_lang_reading, p.spouse_lang_writing,
+      p.spouse_lang_listening, p.spouse_lang_speaking,
+    );
     breakdown.spouse += getSpouseEducationPoints(p.spouse_education);
     breakdown.spouse +=
-      getSpouseLangPoints(rawScoreToClb(p.spouse_lang_reading, p.lang_test, "reading")) +
-      getSpouseLangPoints(rawScoreToClb(p.spouse_lang_writing, p.lang_test, "writing")) +
-      getSpouseLangPoints(rawScoreToClb(p.spouse_lang_listening, p.lang_test, "listening")) +
-      getSpouseLangPoints(rawScoreToClb(p.spouse_lang_speaking, p.lang_test, "speaking"));
+      getSpouseLangPoints(spouseCLB.reading) +
+      getSpouseLangPoints(spouseCLB.writing) +
+      getSpouseLangPoints(spouseCLB.listening) +
+      getSpouseLangPoints(spouseCLB.speaking);
     breakdown.spouse += getSpouseCanadianWorkPoints(p.spouse_canada_work_years);
   }
 
   // ── C: Skill transferability (with proper 50-pt sub-caps + 100-pt overall cap) ──
+  // Skill transferability uses the candidate's STRONGEST first official
+  // language (per IRCC) — that's the firstLang block.
   const transfer = computeSkillTransferability({
     education: p.education,
     firstLangCLB,
     canadianWorkYears: p.canada_work_years,
     foreignWorkYears: p.foreign_work_years,
-    // Profile model has no trades-cert field — see /crs for full granularity.
   });
   breakdown.transferability = transfer.total;
 
   // ── D: Additional points ──
-  // Profile uses booleans, so we always award the lower tier:
-  //   - Job offer: 50 pts (the +200 senior-mgmt tier needs NOC distinction)
-  //   - Canadian education: 15 pts (the +30 3-yr tier needs program length)
-  //   - French bonus: not captured in profile → 0 pts
+  // French bonus: derived from English + French CLB.
+  // - If first lang is English, English block IS the English data.
+  // - If first lang is French, French block goes to the optional-French slot
+  //   and there's no English data (returns "none" for bonus).
+  const englishClbForBonus =
+    p.first_lang_choice === "english" ? firstLangCLB :
+    null;
+  const frenchClbForBonus =
+    p.first_lang_choice === "french" ? firstLangCLB :
+    frenchCLB;
+  const frenchTier = deriveFrenchBonusTier(englishClbForBonus, frenchClbForBonus);
+
+  breakdown.frenchBonus = getFrenchBonusPoints(frenchTier);
+  breakdown.jobOffer = getJobOfferPoints(p.job_offer_tier);
+  breakdown.canadianEducation = getCanadianEducationPoints(p.canadian_education_tier);
   breakdown.additional =
     (p.has_provincial_nomination ? 600 : 0) +
-    (p.has_job_offer ? 50 : 0) +
-    (p.has_canadian_sibling ? 15 : 0) +
-    (p.has_canadian_education ? 15 : 0);
+    breakdown.jobOffer +
+    breakdown.canadianEducation +
+    breakdown.frenchBonus +
+    (p.has_canadian_sibling ? 15 : 0);
 
   const total = Math.min(1200,
     breakdown.age + breakdown.education + breakdown.language +
@@ -152,15 +298,15 @@ function getTips(p: Profile, score: number, cutoff: number): string[] {
   const tips: string[] = [];
   const gap = cutoff - score;
   const minCLB = Math.min(
-    rawScoreToClb(p.first_lang_reading, p.lang_test, "reading"),
-    rawScoreToClb(p.first_lang_writing, p.lang_test, "writing"),
-    rawScoreToClb(p.first_lang_listening, p.lang_test, "listening"),
-    rawScoreToClb(p.first_lang_speaking, p.lang_test, "speaking"),
+    rawScoreToClb(p.first_lang_reading, p.first_lang_test, "reading"),
+    rawScoreToClb(p.first_lang_writing, p.first_lang_test, "writing"),
+    rawScoreToClb(p.first_lang_listening, p.first_lang_test, "listening"),
+    rawScoreToClb(p.first_lang_speaking, p.first_lang_test, "speaking"),
   );
 
   if (!p.has_provincial_nomination)
     tips.push("🏆 Provincial Nomination (PNP) adds 600 pts instantly — explore OINP, BC PNP, AINP");
-  if (!p.has_job_offer)
+  if (p.job_offer_tier === "none")
     tips.push("💼 A qualifying job offer (NOC TEER 0/1/2/3) adds 50–200 points");
   if (p.canada_work_years < 1)
     tips.push("🇨🇦 At least 1 year of Canadian work experience adds 40 points");
@@ -168,6 +314,8 @@ function getTips(p: Profile, score: number, cutoff: number): string[] {
     tips.push("🇨🇦 Increasing Canadian work experience to 3+ years adds up to 80 points");
   if (minCLB < 9)
     tips.push("🗣 Reaching CLB 9 in your weakest language skill unlocks both core and skill-transferability bonuses");
+  if (!p.has_french_lang)
+    tips.push("🇫🇷 Adding NCLC 7+ French unlocks a +25 or +50 bilingual bonus");
   if (gap > 0 && gap <= 50)
     tips.push(`📈 Only ${gap} pts below cut-off — a small improvement could get you an ITA!`);
   if (!p.has_canadian_sibling)
@@ -208,12 +356,7 @@ export default function Dashboard() {
       setUser(u);
       const { data: existing } = await supabase.from("user_profiles").select("*").eq("id", u.id).single();
       if (existing) {
-        setProfile({
-          ...DEFAULT_PROFILE,
-          ...existing,
-          education: normalizeEducation(existing.education),
-          spouse_education: normalizeEducation(existing.spouse_education),
-        });
+        setProfile(normalizeProfile(existing as Partial<Profile>));
       }
       setLoadingProfile(false);
     });
@@ -230,7 +373,45 @@ export default function Dashboard() {
   const isEligible = crsScore >= latestCutoff;
   const tips = useMemo(() => getTips(profile, crsScore, latestCutoff), [profile, crsScore, latestCutoff]);
   const hasSpouse = profile.marital_status === "married";
-  const langOptions = profile.lang_test === "ielts" ? IELTS_OPTIONS : CELPIP_OPTIONS;
+  // Per-test, per-skill score options (centralized in lib/crs).
+  function optionsFor(test: LangTest, skill: Skill): number[] {
+    return TEST_SCORE_OPTIONS[test][skill];
+  }
+  // When the user switches a block's test type, reset its raw scores to the
+  // sensible per-skill defaults for the new test (e.g. CELPIP 7 vs TEF 249).
+  function setBlockTest(
+    block: "first" | "spouse" | "french",
+    newTest: LangTest,
+  ) {
+    const defaults = TEST_DEFAULTS[newTest];
+    setProfile((prev) => {
+      if (block === "first") return {
+        ...prev,
+        first_lang_test: newTest,
+        first_lang_listening: defaults.listening,
+        first_lang_reading:   defaults.reading,
+        first_lang_writing:   defaults.writing,
+        first_lang_speaking:  defaults.speaking,
+      };
+      if (block === "spouse") return {
+        ...prev,
+        spouse_lang_test: newTest,
+        spouse_lang_listening: defaults.listening,
+        spouse_lang_reading:   defaults.reading,
+        spouse_lang_writing:   defaults.writing,
+        spouse_lang_speaking:  defaults.speaking,
+      };
+      return {
+        ...prev,
+        french_lang_test: newTest,
+        french_lang_listening: defaults.listening,
+        french_lang_reading:   defaults.reading,
+        french_lang_writing:   defaults.writing,
+        french_lang_speaking:  defaults.speaking,
+      };
+    });
+    setSaved(false);
+  }
 
   function update<K extends keyof Profile>(key: K, value: Profile[K]) {
     setProfile(prev => ({ ...prev, [key]: value }));
@@ -298,33 +479,53 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Language */}
+            {/* First Official Language */}
             <div className="canada-card p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-base">🗣 Language Skills</h2>
-                {/* Test type toggle */}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h2 className="font-semibold text-base">🗣 First Official Language</h2>
+                {/* English/French choice */}
                 <div className="flex rounded-lg overflow-hidden border border-white/10 text-xs">
-                  {(["ielts", "celpip"] as const).map(t => (
-                    <button key={t} onClick={() => update("lang_test", t)}
+                  {(["english", "french"] as const).map(lang => (
+                    <button key={lang} onClick={() => update("first_lang_choice", lang)}
                       style={{
-                        padding: "5px 14px", fontWeight: 600, border: "none", cursor: "pointer",
-                        background: profile.lang_test === t ? "linear-gradient(135deg,#d52b1e,#a01208)" : "transparent",
-                        color: profile.lang_test === t ? "white" : "#9ca3af",
+                        padding: "5px 12px", fontWeight: 600, border: "none", cursor: "pointer",
+                        background: profile.first_lang_choice === lang ? "linear-gradient(135deg,#d52b1e,#a01208)" : "transparent",
+                        color: profile.first_lang_choice === lang ? "white" : "#9ca3af",
                       }}>
-                      {t.toUpperCase()}
+                      {lang === "english" ? "🇬🇧 English" : "🇫🇷 French"}
                     </button>
                   ))}
                 </div>
               </div>
-              <p className="text-xs text-gray-500">
-                {profile.lang_test === "ielts"
-                  ? "Enter your IELTS General Training scores (0–9 scale, 0.5 steps)"
-                  : "Enter your CELPIP-General scores (1–12 scale)"}
-              </p>
+
+              {/* Test type picker — only tests valid for the chosen language */}
+              <div className="flex flex-wrap gap-2">
+                {(profile.first_lang_choice === "english"
+                  ? (["ielts", "celpip"] as LangTest[])
+                  : (["tef", "tcf"] as LangTest[])
+                ).map(t => (
+                  <button key={t} onClick={() => setBlockTest("first", t)}
+                    className={`canada-pill text-xs ${profile.first_lang_test === t ? "active" : ""}`}>
+                    {TEST_LABEL[t]}
+                  </button>
+                ))}
+              </div>
+
+              {/* If the language flipped but the saved test doesn't match the new
+                  language, force-switch the test before rendering inputs. */}
+              {(() => {
+                const expectedLang = TEST_LANGUAGE[profile.first_lang_test];
+                if (expectedLang !== profile.first_lang_choice) {
+                  // Use setTimeout to defer until after render — calling setProfile during render is illegal
+                  setTimeout(() => setBlockTest("first", profile.first_lang_choice === "english" ? "ielts" : "tef"), 0);
+                }
+                return null;
+              })()}
+
               <div className="grid grid-cols-2 gap-4">
-                {(["first_lang_reading","first_lang_writing","first_lang_listening","first_lang_speaking"] as const).map(key => {
+                {(["first_lang_listening","first_lang_reading","first_lang_writing","first_lang_speaking"] as const).map(key => {
                   const skill = key.replace("first_lang_","") as Skill;
-                  const clb = rawScoreToClb(profile[key], profile.lang_test, skill);
+                  const clb = rawScoreToClb(profile[key], profile.first_lang_test, skill);
                   return (
                     <div key={key}>
                       <label className="text-xs text-gray-400 mb-1 block capitalize">
@@ -333,13 +534,69 @@ export default function Dashboard() {
                       </label>
                       <select value={profile[key]} onChange={e => update(key, Number(e.target.value))}
                         className="canada-input py-2 text-sm">
-                        {langOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                        {optionsFor(profile.first_lang_test, skill).map(v => <option key={v} value={v}>{v}</option>)}
                       </select>
                     </div>
                   );
                 })}
               </div>
             </div>
+
+            {/* Optional French Language Block — for English-first applicants who also have French */}
+            {profile.first_lang_choice === "english" && (
+              <div className="canada-card p-6 space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h2 className="font-semibold text-base">🇫🇷 French Language (optional)</h2>
+                    <p className="text-xs text-gray-500 mt-1">
+                      NCLC 7+ in all 4 French skills earns +25 (or +50 with strong English).
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={profile.has_french_lang}
+                      onChange={e => update("has_french_lang", e.target.checked)}
+                      className="w-4 h-4 accent-red-600 cursor-pointer" />
+                    <span className="text-sm text-gray-300">I have French scores</span>
+                  </label>
+                </div>
+
+                {profile.has_french_lang && (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {(["tef", "tcf"] as LangTest[]).map(t => (
+                        <button key={t} onClick={() => setBlockTest("french", t)}
+                          className={`canada-pill text-xs ${profile.french_lang_test === t ? "active" : ""}`}>
+                          {TEST_LABEL[t]}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {(["french_lang_listening","french_lang_reading","french_lang_writing","french_lang_speaking"] as const).map(key => {
+                        const skill = key.replace("french_lang_","") as Skill;
+                        const clb = rawScoreToClb(profile[key], profile.french_lang_test, skill);
+                        return (
+                          <div key={key}>
+                            <label className="text-xs text-gray-400 mb-1 block capitalize">
+                              {skill.charAt(0).toUpperCase() + skill.slice(1)}
+                              <span className="text-gray-600 ml-2">→ CLB {clb}</span>
+                            </label>
+                            <select value={profile[key]} onChange={e => update(key, Number(e.target.value))}
+                              className="canada-input py-2 text-sm">
+                              {optionsFor(profile.french_lang_test, skill).map(v => <option key={v} value={v}>{v}</option>)}
+                            </select>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="bg-blue-900/20 border border-blue-800/30 rounded-lg px-3 py-2 text-xs text-blue-300">
+                      French bonus: <strong>+{breakdown.frenchBonus} pts</strong> (auto-detected from your scores)
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Spouse Section — only if married */}
             {hasSpouse && (
@@ -357,11 +614,43 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Spouse Language Scores ({profile.lang_test.toUpperCase()})</label>
+                  <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                    <label className="text-xs text-gray-400 block">Spouse Language Test</label>
+                    <div className="flex rounded-lg overflow-hidden border border-white/10 text-xs">
+                      {(["english", "french"] as const).map(lang => (
+                        <button key={lang} onClick={() => update("spouse_lang_choice", lang)}
+                          style={{
+                            padding: "4px 10px", fontWeight: 600, border: "none", cursor: "pointer",
+                            background: profile.spouse_lang_choice === lang ? "linear-gradient(135deg,#d52b1e,#a01208)" : "transparent",
+                            color: profile.spouse_lang_choice === lang ? "white" : "#9ca3af",
+                          }}>
+                          {lang === "english" ? "🇬🇧" : "🇫🇷"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {(profile.spouse_lang_choice === "english"
+                      ? (["ielts", "celpip"] as LangTest[])
+                      : (["tef", "tcf"] as LangTest[])
+                    ).map(t => (
+                      <button key={t} onClick={() => setBlockTest("spouse", t)}
+                        className={`canada-pill text-xs ${profile.spouse_lang_test === t ? "active" : ""}`}>
+                        {TEST_LABEL[t]}
+                      </button>
+                    ))}
+                  </div>
+                  {(() => {
+                    const expectedLang = TEST_LANGUAGE[profile.spouse_lang_test];
+                    if (expectedLang !== profile.spouse_lang_choice) {
+                      setTimeout(() => setBlockTest("spouse", profile.spouse_lang_choice === "english" ? "ielts" : "tef"), 0);
+                    }
+                    return null;
+                  })()}
                   <div className="grid grid-cols-2 gap-3">
-                    {(["spouse_lang_reading","spouse_lang_writing","spouse_lang_listening","spouse_lang_speaking"] as const).map(key => {
+                    {(["spouse_lang_listening","spouse_lang_reading","spouse_lang_writing","spouse_lang_speaking"] as const).map(key => {
                       const skill = key.replace("spouse_lang_","") as Skill;
-                      const clb = rawScoreToClb(profile[key], profile.lang_test, skill);
+                      const clb = rawScoreToClb(profile[key], profile.spouse_lang_test, skill);
                       return (
                         <div key={key}>
                           <label className="text-xs text-gray-500 mb-1 block capitalize">
@@ -370,7 +659,7 @@ export default function Dashboard() {
                           </label>
                           <select value={profile[key]} onChange={e => update(key, Number(e.target.value))}
                             className="canada-input py-2 text-sm">
-                            {langOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                            {optionsFor(profile.spouse_lang_test, skill).map(v => <option key={v} value={v}>{v}</option>)}
                           </select>
                         </div>
                       );
@@ -411,14 +700,48 @@ export default function Dashboard() {
             </div>
 
             {/* Additional Factors */}
-            <div className="canada-card p-6 space-y-3">
+            <div className="canada-card p-6 space-y-4">
               <h2 className="font-semibold text-base">⭐ Additional Factors</h2>
+
+              {/* Job offer — tiered (200 vs 50 vs 0) */}
+              <div>
+                <p className="text-xs text-gray-400 mb-1.5">Valid Canadian Job Offer</p>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { val: "none", label: "None", pts: "0" },
+                    { val: "noc_teer_0_major_00", label: "TEER 0 Major Group 00 (CEO/CFO/GM)", pts: "+200" },
+                    { val: "noc_teer_0_1_2_3", label: "Other valid NOC TEER 0/1/2/3", pts: "+50" },
+                  ] as const).map(({ val, label, pts }) => (
+                    <button key={val} onClick={() => update("job_offer_tier", val)}
+                      className={`canada-pill text-xs ${profile.job_offer_tier === val ? "active" : ""}`}>
+                      {label} <span className="ml-1 opacity-70">{pts}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Canadian education — tiered (15 vs 30) */}
+              <div>
+                <p className="text-xs text-gray-400 mb-1.5">Canadian Post-Secondary Education</p>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { val: "none", label: "None", pts: "0" },
+                    { val: "one_or_two_year", label: "1–2 year program", pts: "+15" },
+                    { val: "three_year_plus", label: "3+ year program", pts: "+30" },
+                  ] as const).map(({ val, label, pts }) => (
+                    <button key={val} onClick={() => update("canadian_education_tier", val)}
+                      className={`canada-pill text-xs ${profile.canadian_education_tier === val ? "active" : ""}`}>
+                      {label} <span className="ml-1 opacity-70">{pts}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Boolean factors that don't have tiers */}
               {([
-                { key: "has_canadian_education", label: "2+ year Canadian post-secondary degree/diploma", points: "+15" },
-                { key: "has_provincial_nomination", label: "Provincial Nomination (PNP)", points: "+600" },
-                { key: "has_job_offer", label: "Qualifying Canadian job offer (TEER 0/1/2/3)", points: "+50" },
-                { key: "has_canadian_sibling", label: "Sibling who is a Canadian citizen or PR", points: "+15" },
-              ] as const).map(({ key, label, points }) => (
+                { key: "has_provincial_nomination" as const, label: "Provincial Nomination (PNP)", points: "+600" },
+                { key: "has_canadian_sibling" as const, label: "Sibling who is a Canadian citizen or PR", points: "+15" },
+              ]).map(({ key, label, points }) => (
                 <label key={key} className="flex items-center justify-between gap-3 cursor-pointer group">
                   <div className="flex items-center gap-3">
                     <input type="checkbox" checked={profile[key]} onChange={e => update(key, e.target.checked)}
