@@ -127,7 +127,7 @@ export const PNP_DATASET: DataSet<true> = {
    modified it materially since 2017 but has tweaked weights occasionally.
    Re-verify whenever IRCC announces a CRS change.                              */
 export const CRS_FORMULA: DataSet<true> = {
-  lastVerified: "2026-05-08",
+  lastVerified: "2026-05-09",
   source: "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/eligibility/criteria-comprehensive-ranking-system/grid.html",
   sourceLabel: "canada.ca · CRS scoring grid",
   cadence: "as-needed",
