@@ -74,10 +74,11 @@ export default function Home() {
         {/* 3 — At-a-glance live data */}
         <section>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Latest draw */}
+            {/* Latest draw — min-h reserves vertical space so the
+                placeholder→data transition doesn't shift the page (CLS). */}
             <a
               href="/draws"
-              className="canada-card p-4 transition-colors hover:border-yellow-500/40"
+              className="canada-card p-4 transition-colors hover:border-yellow-500/40 min-h-[112px] flex flex-col"
               style={{ textDecoration: "none" }}
             >
               <div className="flex items-center gap-2 mb-1">
@@ -95,17 +96,18 @@ export default function Home() {
               </p>
             </a>
 
-            {/* Latest news */}
+            {/* Latest news — same min-h. The 2-line title (line-clamp-2)
+                was the worst CLS culprit on this page; reserve both lines. */}
             <a
               href="/news"
-              className="canada-card p-4 transition-colors hover:border-blue-500/40"
+              className="canada-card p-4 transition-colors hover:border-blue-500/40 min-h-[112px] flex flex-col"
               style={{ textDecoration: "none" }}
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-base">📰</span>
                 <p className="text-xs text-gray-400 uppercase tracking-wide">Latest IRCC News</p>
               </div>
-              <p className="text-sm font-semibold text-white mt-1 line-clamp-2 leading-snug">
+              <p className="text-sm font-semibold text-white mt-1 line-clamp-2 leading-snug min-h-[2.5rem]">
                 {latestNews?.title ?? "Loading…"}
               </p>
               <p className="text-xs text-gray-500 mt-1">
@@ -116,7 +118,7 @@ export default function Home() {
             {/* Processing freshness */}
             <a
               href="/processing"
-              className="canada-card p-4 transition-colors hover:border-green-500/40"
+              className="canada-card p-4 transition-colors hover:border-green-500/40 min-h-[112px] flex flex-col"
               style={{ textDecoration: "none" }}
             >
               <div className="flex items-center gap-2 mb-1">

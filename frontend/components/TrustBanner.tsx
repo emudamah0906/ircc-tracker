@@ -65,7 +65,10 @@ export default async function TrustBanner() {
 
   return (
     <div
-      className={`w-full border-b text-xs ${
+      // Fixed min-height reserves the banner's vertical space before
+      // Supabase data resolves so we never shift the page below it
+      // (Lighthouse CLS culprit before the May 2026 perf pass).
+      className={`w-full border-b text-xs min-h-[36px] ${
         isStale
           ? "bg-amber-950/40 border-amber-800/40 text-amber-200"
           : "bg-white/[0.03] border-white/5 text-gray-400"
@@ -73,7 +76,7 @@ export default async function TrustBanner() {
       role="region"
       aria-label="Site freshness and source"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-1.5 flex flex-wrap items-center justify-center sm:justify-between gap-x-4 gap-y-1">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-1.5 flex flex-wrap items-center justify-center sm:justify-between gap-x-4 gap-y-1 min-h-[36px]">
         <div className="flex items-center gap-1.5">
           <span aria-hidden="true">🔄</span>
           <span>
