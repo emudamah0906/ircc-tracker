@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import FeedbackButton from "@/components/FeedbackButton";
+import TrustBanner from "@/components/TrustBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -70,6 +71,12 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <div className="canada-topbar" />
+        {/* Site-wide trust signal: live "Last IRCC sync: Xh ago" + sources +
+            link to /methodology. Sits in flow above every page header so it
+            doesn't push or hide any sticky/fixed elements (avoiding the
+            position conflict the original `fixed top-0` proposal would have
+            caused with the existing Header + the /crs sticky score panel). */}
+        <TrustBanner />
         {children}
         <FeedbackButton />
         <script
