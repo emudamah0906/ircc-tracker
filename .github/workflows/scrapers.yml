@@ -49,6 +49,13 @@ jobs:
         # No continue-on-error: a silently-failing scraper went 25 days
         # before anyone noticed last time. Fail loud, fix fast.
 
+      - name: Run Ontario OINP scraper
+        working-directory: scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python oinp_scraper.py
+
       - name: Fetch IRCC news (invokes Supabase Edge Function)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
