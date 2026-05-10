@@ -773,6 +773,11 @@ export default function CRSCalculatorPage() {
     } catch {}
   }, [form]);
 
+  // Recent draws power the "Latest Cutoff" comparison + score-vs-history
+  // chart. If the fetch fails we fall back to the latestCutoff default
+  // (477) and hide the comparison sections — the calculator itself still
+  // works without this data.
+  const [drawsFetchFailed, setDrawsFetchFailed] = useState(false);
   useEffect(() => {
     supabase
       .from("pr_draws")
@@ -781,7 +786,12 @@ export default function CRSCalculatorPage() {
       .not("crs_score", "is", null)
       .order("draw_date", { ascending: false })
       .limit(10)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("[crs] recent-draws fetch failed:", error.message);
+          setDrawsFetchFailed(true);
+          return;
+        }
         if (data) {
           setRecentDraws(
             data.map((d) => ({
@@ -1267,7 +1277,7 @@ export default function CRSCalculatorPage() {
                 <p className="text-sm text-gray-300">
                   Latest Federal draw cutoff:{" "}
                   <span className="font-bold text-white">
-                    {recentDraws.length > 0 ? latestCutoff : "Loading…"}
+                    {recentDraws.length > 0 ? latestCutoff : drawsFetchFailed ? `≈${latestCutoff}` : "Loading…"}
                   </span>
                 </p>
                 {recentDraws.length > 0 && (

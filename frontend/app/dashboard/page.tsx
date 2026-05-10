@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PageLayout from "@/components/PageLayout";
+import { LoadingState, ErrorState } from "@/components/QueryStates";
 import type { User } from "@supabase/supabase-js";
 import {
   getAgePoints,
@@ -348,21 +349,41 @@ export default function Dashboard() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       const u = data.session?.user ?? null;
       if (!u) { router.push("/auth"); return; }
       setUser(u);
-      const { data: existing } = await supabase.from("user_profiles").select("*").eq("id", u.id).single();
-      if (existing) {
-        setProfile(normalizeProfile(existing as Partial<Profile>));
+      try {
+        const { data: existing, error } = await supabase
+          .from("user_profiles")
+          .select("*")
+          .eq("id", u.id)
+          .single();
+        // PGRST116 = "no rows returned" — that's normal for a brand new user.
+        if (error && error.code !== "PGRST116") {
+          throw new Error(error.message);
+        }
+        if (existing) {
+          setProfile(normalizeProfile(existing as Partial<Profile>));
+        }
+      } catch (err) {
+        setProfileError(err instanceof Error ? err.message : "Couldn't load your saved profile.");
+      } finally {
+        setLoadingProfile(false);
       }
-      setLoadingProfile(false);
     });
+    // Latest cutoff is a soft requirement — failures degrade gracefully to
+    // the 477 default. Logged silently.
     supabase.from("pr_draws").select("crs_score, draw_date").is("province", null)
       .order("draw_date", { ascending: false }).limit(1)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("[dashboard] latest-cutoff fetch failed:", error.message);
+          return;
+        }
         if (data?.[0]?.crs_score) setLatestCutoff(data[0].crs_score);
         if (data?.[0]?.draw_date) setLatestDrawDate(data[0].draw_date);
       });
@@ -429,9 +450,18 @@ export default function Dashboard() {
   if (loadingProfile) {
     return (
       <PageLayout activeNav="dashboard">
-        <div className="flex items-center justify-center py-20">
-          <p className="text-gray-400">Loading your profile...</p>
-        </div>
+        <LoadingState label="Loading your profile…" />
+      </PageLayout>
+    );
+  }
+  if (profileError) {
+    return (
+      <PageLayout activeNav="dashboard">
+        <ErrorState
+          message={profileError}
+          onRetry={() => window.location.reload()}
+          hint="Your saved profile couldn't be loaded — usually a brief Supabase blip. A reload almost always fixes it."
+        />
       </PageLayout>
     );
   }

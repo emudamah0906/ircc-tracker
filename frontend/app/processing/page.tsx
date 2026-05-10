@@ -6,6 +6,7 @@ import { getFlagEmoji, COUNTRY_NAMES } from "@/lib/countries";
 import TrendChart from "@/components/TrendChart";
 import AlertSignup from "@/components/AlertSignup";
 import PageLayout from "@/components/PageLayout";
+import { LoadingState, ErrorState } from "@/components/QueryStates";
 
 // location: "outside" = applying from abroad | "inside" = already in Canada | "both" = applies to both
 const VISA_TYPES = [
@@ -57,6 +58,7 @@ export default function ProcessingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [tableSearch, setTableSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [location, setLocation] = useState<"outside" | "inside">("outside");
@@ -64,12 +66,29 @@ export default function ProcessingPage() {
   const processingRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 20;
 
+  // Used for both the initial fetch and silent re-fetches (realtime, poll,
+  // tab-visibility). The shared useSupabaseQuery hook isn't a clean fit
+  // here because it doesn't expose silent-refetch — instead we keep this
+  // bespoke fetcher and just add error visibility.
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    const { data: rows } = await supabase.from("latest_processing_times").select("*");
-    setData(rows || []);
-    if (rows?.length) setLastUpdated(rows[0].fetched_at);
-    if (!silent) setLoading(false);
+    try {
+      const { data: rows, error: fetchErr } = await supabase
+        .from("latest_processing_times")
+        .select("*");
+      if (fetchErr) throw new Error(fetchErr.message);
+      setData(rows || []);
+      if (rows?.length) setLastUpdated(rows[0].fetched_at);
+      setError(null); // clear any prior error on successful re-fetch
+    } catch (err) {
+      // Only flip the visible error state on the user-facing initial load.
+      // Silent re-fetch failures are logged but don't disrupt what's
+      // already on screen — the previous successful data stays visible.
+      if (!silent) setError(err instanceof Error ? err.message : "Couldn't load processing times.");
+      else console.warn("[processing] silent refetch failed:", err);
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -174,7 +193,13 @@ export default function ProcessingPage() {
   return (
     <PageLayout activeNav="processing" lastUpdated={lastUpdated}>
       {loading ? (
-        <div className="text-center py-32 text-gray-500">Loading processing times...</div>
+        <LoadingState label="Loading processing times…" />
+      ) : error ? (
+        <ErrorState
+          message={error}
+          onRetry={() => fetchData(false)}
+          hint="If this keeps happening, our IRCC sync may be temporarily down — we usually recover within an hour."
+        />
       ) : (
         <>
           {/* Header */}

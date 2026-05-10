@@ -3,10 +3,14 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import PageLayout from "@/components/PageLayout";
+import { useSupabaseQuery } from "@/lib/useSupabaseQuery";
+import { LoadingState, ErrorState, EmptyState } from "@/components/QueryStates";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
+
+const PAGE_SIZE = 20;
 
 const IRCC_DRAWS_URL = "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/submit-profile/rounds-invitations.html";
 
@@ -36,29 +40,42 @@ const PROVINCES = [
 ];
 
 export default function DrawsPage() {
+  // Initial fetch via the shared hook — gives us real loading + error state
+  // (vs. the old `if (error) return` that silently hid Supabase outages).
+  const {
+    data: initialDraws,
+    loading: initialLoading,
+    error: fetchError,
+    refetch,
+  } = useSupabaseQuery<Draw[]>(
+    async () => {
+      const res = await supabase
+        .from("pr_draws")
+        .select("*")
+        .order("draw_date", { ascending: false })
+        .limit(100);
+      return { data: res.data as Draw[] | null, error: res.error };
+    },
+    [],
+  );
+
+  // Local state lets realtime INSERT events prepend to the list without
+  // discarding the user's filter / pagination position.
   const [draws, setDraws] = useState<Draw[]>([]);
   const [filtered, setFiltered] = useState<Draw[]>([]);
   const [selectedProvince, setSelectedProvince] = useState("all");
-  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
   /** Set briefly when a new row arrives via realtime so we can flash a "live" indicator. */
   const [liveFlash, setLiveFlash] = useState(false);
 
+  // Sync the hook's initial fetch into the local mutable state.
   useEffect(() => {
-    async function fetchDraws() {
-      const { data, error } = await supabase
-        .from("pr_draws")
-        .select("*")
-        .order("draw_date", { ascending: false })
-        .limit(100);
+    if (initialDraws) setDraws(initialDraws);
+  }, [initialDraws]);
 
-      if (error) return;
-      setDraws(data || []);
-      setLoading(false);
-    }
-    fetchDraws();
-
+  useEffect(() => {
     // ── Realtime: prepend new rows as IRCC publishes them ──
     // The scraper inserts into pr_draws on a 6-hour cron; this subscription
     // means visitors who happen to be on /draws when a new row lands see it
@@ -98,7 +115,15 @@ export default function DrawsPage() {
       result = draws.filter((d) => d.province === selectedProvince);
     }
     setFiltered(result);
+    // Reset to first page whenever the filter narrows the result set.
+    setCurrentPage(1);
   }, [draws, selectedProvince]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedDraws = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   async function subscribeDrawAlerts(e: React.FormEvent) {
     e.preventDefault();
@@ -312,62 +337,143 @@ export default function DrawsPage() {
       </div>
 
       {/* Draws Table */}
-      {loading ? (
-        <div className="text-center py-20 text-gray-500">Loading draws...</div>
+      {initialLoading ? (
+        <LoadingState label="Loading draws…" />
+      ) : fetchError ? (
+        <ErrorState
+          message={fetchError}
+          onRetry={refetch}
+          hint="If this keeps happening, the IRCC data sync may be temporarily down — we usually recover within an hour."
+        />
       ) : (
         <section>
-          <h2 className="text-lg font-semibold mb-3">
-            {selectedProvince === "all" ? "All Recent Draws" :
-             PROVINCES.find(p => p.key === selectedProvince)?.label}
-          </h2>
-          <div className="canada-table overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-gray-400 uppercase text-xs">
-                <tr>
-                  <th className="px-4 py-3 text-left">Date</th>
-                  <th className="px-4 py-3 text-left">Draw Type</th>
-                  <th className="px-4 py-3 text-left">Program</th>
-                  <th className="px-4 py-3 text-right">Invitations</th>
-                  <th className="px-4 py-3 text-right">CRS Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((draw) => (
-                  <tr key={draw.id} className="transition-colors border-t border-white/5">
-                    <td className="px-4 py-3 text-gray-300">
-                      {new Date(draw.draw_date).toLocaleDateString("en-CA", {
-                        month: "short", day: "numeric", year: "numeric"
-                      })}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                        draw.province === null
-                          ? "bg-red-900/60 text-red-300"
-                          : "bg-blue-900/60 text-blue-300"
-                      }`}>
-                        {draw.province === null ? "Federal" : draw.province}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-200">{draw.program}</td>
-                    <td className="px-4 py-3 text-right font-mono text-white">
-                      {draw.invitations.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      {draw.crs_score ? (
-                        <span className="text-yellow-400 font-bold">{draw.crs_score}</span>
-                      ) : (
-                        <span className="text-gray-500">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex items-end justify-between gap-4 mb-3 flex-wrap">
+            <h2 className="text-lg font-semibold">
+              {selectedProvince === "all" ? "All Recent Draws" :
+               PROVINCES.find(p => p.key === selectedProvince)?.label}
+            </h2>
+            {filtered.length > 0 && (
+              <p className="text-xs text-gray-500">
+                Showing <span className="text-gray-300 font-semibold">
+                  {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}
+                </span> of <span className="text-gray-300 font-semibold">{filtered.length}</span>
+              </p>
+            )}
           </div>
-          {filtered.length === 0 && (
-            <p className="text-center text-gray-500 py-8">
-              No draws found for this province yet. Check back soon!
-            </p>
+
+          {filtered.length === 0 ? (
+            <EmptyState
+              emoji="📭"
+              title="No draws match this filter"
+              body={
+                selectedProvince === "all"
+                  ? "We haven't received any draws from IRCC yet. New draws appear here automatically as IRCC publishes them."
+                  : `No ${PROVINCES.find(p => p.key === selectedProvince)?.label} draws on file. Try "All Draws" or another province.`
+              }
+            />
+          ) : (
+            <>
+              <div className="canada-table overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-gray-400 uppercase text-xs">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Date</th>
+                      <th className="px-4 py-3 text-left">Draw Type</th>
+                      <th className="px-4 py-3 text-left">Program</th>
+                      <th className="px-4 py-3 text-right">Invitations</th>
+                      <th className="px-4 py-3 text-right">CRS Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedDraws.map((draw) => (
+                      <tr key={draw.id} className="transition-colors border-t border-white/5">
+                        <td className="px-4 py-3 text-gray-300">
+                          {new Date(draw.draw_date).toLocaleDateString("en-CA", {
+                            month: "short", day: "numeric", year: "numeric"
+                          })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                            draw.province === null
+                              ? "bg-red-900/60 text-red-300"
+                              : "bg-blue-900/60 text-blue-300"
+                          }`}>
+                            {draw.province === null ? "Federal" : draw.province}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-200">{draw.program}</td>
+                        <td className="px-4 py-3 text-right font-mono text-white">
+                          {draw.invitations.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {draw.crs_score ? (
+                            <span className="text-yellow-400 font-bold">{draw.crs_score}</span>
+                          ) : (
+                            <span className="text-gray-500">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination — first / prev / 1 2 3… / next / last */}
+              {totalPages > 1 && (
+                <nav
+                  aria-label="Draws pagination"
+                  className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                >
+                  <p className="text-xs text-gray-500">
+                    Page <span className="text-gray-300 font-semibold">{currentPage}</span> of{" "}
+                    <span className="text-gray-300 font-semibold">{totalPages}</span>
+                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="px-2.5 py-1 text-xs rounded bg-white/5 hover:bg-white/10 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                      aria-label="First page"
+                    >« First</button>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-2.5 py-1 text-xs rounded bg-white/5 hover:bg-white/10 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                      aria-label="Previous page"
+                    >‹ Prev</button>
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                      if (page < 1 || page > totalPages) return null;
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 text-xs rounded font-mono ${
+                            currentPage === page
+                              ? "bg-red-600 text-white font-bold"
+                              : "bg-white/5 hover:bg-white/10 text-gray-300"
+                          }`}
+                          aria-label={`Go to page ${page}`}
+                          aria-current={currentPage === page ? "page" : undefined}
+                        >{page}</button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-2.5 py-1 text-xs rounded bg-white/5 hover:bg-white/10 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                      aria-label="Next page"
+                    >Next ›</button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="px-2.5 py-1 text-xs rounded bg-white/5 hover:bg-white/10 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                      aria-label="Last page"
+                    >Last »</button>
+                  </div>
+                </nav>
+              )}
+            </>
           )}
         </section>
       )}
