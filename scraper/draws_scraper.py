@@ -155,7 +155,8 @@ def insert_new_draws(rows: list[dict]) -> int:
     return len(rows)
 
 
-def main() -> None:
+def main() -> int:
+    """Returns the count of newly inserted rows so health metadata can include it."""
     started = datetime.now(timezone.utc).isoformat()
     print(f"[draws] started at {started}")
 
@@ -185,11 +186,17 @@ def main() -> None:
     inserted = insert_new_draws(new_rows)
     print(f"[draws] inserted {inserted} new rows")
     print("[draws] done.")
+    return inserted
 
 
 if __name__ == "__main__":
+    # Local import keeps the rest of the file usable without health.py
+    # (e.g. one-off CLI runs against a non-Supabase target).
+    from health import report_success, report_failure
     try:
-        main()
+        n = main()
+        report_success("draws", metadata={"rows_inserted": n})
     except Exception as exc:
         print(f"[draws] ERROR: {exc}", file=sys.stderr)
+        report_failure("draws", error=str(exc))
         sys.exit(1)

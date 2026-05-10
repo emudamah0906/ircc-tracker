@@ -42,6 +42,8 @@ export default function DrawsPage() {
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  /** Set briefly when a new row arrives via realtime so we can flash a "live" indicator. */
+  const [liveFlash, setLiveFlash] = useState(false);
 
   useEffect(() => {
     async function fetchDraws() {
@@ -56,6 +58,36 @@ export default function DrawsPage() {
       setLoading(false);
     }
     fetchDraws();
+
+    // ── Realtime: prepend new rows as IRCC publishes them ──
+    // The scraper inserts into pr_draws on a 6-hour cron; this subscription
+    // means visitors who happen to be on /draws when a new row lands see it
+    // appear in-place without needing to refresh. Requires pr_draws to be
+    // a member of the supabase_realtime publication (see
+    // supabase/add_pr_draws_realtime.sql).
+    const channel = supabase
+      .channel("pr_draws_inserts")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "pr_draws" },
+        (payload) => {
+          const newDraw = payload.new as Draw;
+          if (!newDraw || typeof newDraw.id !== "number") return;
+          setDraws((prev) => {
+            // Defensive: dedupe by id in case the initial fetch raced the event.
+            if (prev.some((d) => d.id === newDraw.id)) return prev;
+            // Insert at the front and re-cap at 100 so the page never grows.
+            return [newDraw, ...prev].slice(0, 100);
+          });
+          setLiveFlash(true);
+          setTimeout(() => setLiveFlash(false), 4000);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
@@ -92,9 +124,24 @@ export default function DrawsPage() {
 
       {/* Page heading */}
       <div>
-        <h1 className="text-2xl font-bold">🗳 PR Draws</h1>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold">🗳 PR Draws</h1>
+          {/* Live indicator: solid green dot when realtime is connected;
+              flashes white when a brand-new draw arrives via subscription. */}
+          <span
+            className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full transition-colors ${
+              liveFlash
+                ? "bg-white/15 text-white border border-white/30"
+                : "bg-green-900/40 text-green-300 border border-green-700/50"
+            }`}
+            title="Page subscribes to new draws via Supabase Realtime — no refresh needed."
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${liveFlash ? "bg-white animate-pulse" : "bg-green-400"}`} />
+            {liveFlash ? "NEW DRAW" : "LIVE"}
+          </span>
+        </div>
         <p className="text-gray-400 text-sm mt-1">
-          Express Entry & Provincial Nominee Program draw results — synced from IRCC.{" "}
+          Express Entry & Provincial Nominee Program draw results — synced from IRCC the moment they publish.{" "}
           <a href={IRCC_DRAWS_URL} target="_blank" rel="noopener noreferrer"
             className="text-blue-400 hover:text-blue-300">
             View official IRCC page →
